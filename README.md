@@ -32,6 +32,7 @@ pnpm run query -- --package .wbc/phase1 --kind gsap_scrub --limit 10
 pnpm run evidence -- --package .wbc/phase1 --type mutation --limit 20 --byte-budget 65536
 pnpm run review -- --package artifacts/phase1/latest
 pnpm run benchmark -- --package artifacts/phase1/latest --iterations 3
+pnpm run benchmark:synthetic -- --package artifacts/phase1/latest --records 50000 --evidence-mb 100 --iterations 3
 pnpm run verify -- --contract .wbc/phase1/behavior-contract.json --target reference
 pnpm run verify:replica -- --contract .wbc/phase1/behavior-contract.json
 pnpm run probe -- --out .wbc/phase1/technical-probe-report.json
