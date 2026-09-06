@@ -26,6 +26,17 @@ test('serves a verified session through a read-only loopback review UI', { timeo
     assert.equal(evidence.records.length, 2);
     assert.ok(evidence.returnedBytes <= 32_768);
 
+    const visualsResponse = await fetch(`${server.url}/api/visuals`);
+    const visuals = await visualsResponse.json() as { count: number; visuals: Array<{ id: string; mediaType: string }> };
+    assert.ok(visuals.count > 0);
+    assert.equal(visuals.visuals[0]?.mediaType, 'image/png');
+    const imageResponse = await fetch(`${server.url}/api/visual/${encodeURIComponent(visuals.visuals[0]!.id)}`);
+    assert.equal(imageResponse.status, 200);
+    assert.equal(imageResponse.headers.get('content-type'), 'image/png');
+    assert.ok((await imageResponse.arrayBuffer()).byteLength > 100);
+    const traversalResponse = await fetch(`${server.url}/api/visual/${encodeURIComponent('../behavior-contract.json')}`);
+    assert.equal(traversalResponse.status, 404);
+
     const invalidResponse = await fetch(`${server.url}/api/behaviors?kind=unknown`);
     assert.equal(invalidResponse.status, 400);
     const methodResponse = await fetch(`${server.url}/api/session`, { method: 'POST' });
@@ -41,6 +52,7 @@ test('serves a verified session through a read-only loopback review UI', { timeo
       await page.locator('#metrics .metric').first().waitFor();
       assert.equal(await page.locator('#metrics .metric').count(), 4);
       assert.equal(await page.locator('#behaviors .card').count(), 5);
+      assert.equal(await page.locator('#visuals figure').count(), visuals.count);
       assert.equal(await page.locator('#error').textContent(), '');
     } finally {
       await browser.close();

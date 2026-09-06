@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto';
 import { createServer, type ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, resolve } from 'node:path';
+import { extname, isAbsolute, resolve, sep } from 'node:path';
 import { reviewRoot } from './paths.js';
 import { inspectSessionPackage, querySessionBehaviors, querySessionRecords, type SessionRecordQuery } from './session-index.js';
-import type { BehaviorKind } from './types.js';
+import { validateContract, validateSessionIndexManifest } from './validate.js';
+import type { BehaviorKind, ContractPackage } from './types.js';
 
 const behaviorKinds: BehaviorKind[] = ['hover', 'css_animation', 'interrupted_transition', 'scroll_reveal', 'gsap_scrub'];
 const assets = new Map([
@@ -32,6 +34,22 @@ function optionalNumber(url: URL, key: string): number | undefined {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) throw new Error(`${key} must be a finite number`);
   return parsed;
+}
+
+function resolveInside(packageRoot: string, relativePath: string): string {
+  if (isAbsolute(relativePath)) throw new Error('Evidence path must be relative');
+  const resolved = resolve(packageRoot, relativePath);
+  if (resolved !== packageRoot && !resolved.startsWith(`${packageRoot}${sep}`)) {
+    throw new Error('Evidence path escapes the session package');
+  }
+  return resolved;
+}
+
+async function loadVerifiedContract(packageRoot: string): Promise<ContractPackage> {
+  await inspectSessionPackage(packageRoot);
+  const manifest = await validateSessionIndexManifest(JSON.parse(await readFile(resolve(packageRoot, 'session-index.json'), 'utf8')));
+  const contractPath = resolveInside(packageRoot, manifest.contract.path);
+  return validateContract(JSON.parse(await readFile(contractPath, 'utf8')));
 }
 
 export async function startReviewServer(packageDirectory: string, port = 0): Promise<ReviewServer> {
@@ -78,6 +96,37 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
           if (value !== undefined) query[field] = value;
         }
         writeJson(response, 200, await querySessionRecords(packageRoot, query));
+        return;
+      }
+      if (url.pathname === '/api/visuals') {
+        const contract = await loadVerifiedContract(packageRoot);
+        const visuals = contract.evidenceIndex
+          .filter((entry) => entry.mediaType === 'image/png')
+          .map(({ id, path, mediaType, sha256 }) => ({ id, path, mediaType, sha256 }));
+        writeJson(response, 200, { visuals, count: visuals.length });
+        return;
+      }
+      if (url.pathname.startsWith('/api/visual/')) {
+        const evidenceId = decodeURIComponent(url.pathname.slice('/api/visual/'.length));
+        const contract = await loadVerifiedContract(packageRoot);
+        const evidence = contract.evidenceIndex.find((entry) => entry.id === evidenceId && entry.mediaType === 'image/png');
+        if (!evidence) {
+          writeJson(response, 404, { error: 'visual_not_found' });
+          return;
+        }
+        const filePath = resolveInside(packageRoot, evidence.path);
+        const bytes = await readFile(filePath);
+        const actualHash = createHash('sha256').update(bytes).digest('hex');
+        if (actualHash !== evidence.sha256) throw new Error('Visual evidence checksum mismatch');
+        response.writeHead(200, {
+          'content-type': 'image/png',
+          'cache-control': 'no-store',
+          'content-security-policy': "default-src 'none'; img-src 'self'",
+          'cross-origin-resource-policy': 'same-origin',
+          'x-content-type-options': 'nosniff',
+          'x-frame-options': 'DENY',
+        });
+        response.end(bytes);
         return;
       }
 

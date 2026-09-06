@@ -3,6 +3,7 @@ const metrics = document.querySelector('#metrics');
 const behaviors = document.querySelector('#behaviors');
 const targets = document.querySelector('#targets');
 const evidence = document.querySelector('#evidence');
+const visuals = document.querySelector('#visuals');
 const error = document.querySelector('#error');
 
 function appendTextCell(row, value) {
@@ -28,6 +29,22 @@ async function loadEvidence() {
     appendTextCell(row, record.targetRef);
     appendTextCell(row, record.sourceTime.toFixed(1));
     evidence.append(row);
+  }
+}
+
+async function loadVisuals() {
+  const page = await json('/api/visuals');
+  visuals.replaceChildren();
+  for (const visual of page.visuals) {
+    const figure = document.createElement('figure');
+    const image = document.createElement('img');
+    image.loading = 'lazy';
+    image.src = `/api/visual/${encodeURIComponent(visual.id)}`;
+    image.alt = `Visual evidence ${visual.id}`;
+    const caption = document.createElement('figcaption');
+    caption.textContent = `${visual.id} · ${visual.sha256.slice(0, 12)}…`;
+    figure.append(image, caption);
+    visuals.append(figure);
   }
 }
 
@@ -66,7 +83,7 @@ async function load() {
       appendTextCell(row, target.completeness);
       targets.append(row);
     }
-    await loadEvidence();
+    await Promise.all([loadEvidence(), loadVisuals()]);
   } catch (cause) {
     error.textContent = cause instanceof Error ? cause.message : String(cause);
   }
