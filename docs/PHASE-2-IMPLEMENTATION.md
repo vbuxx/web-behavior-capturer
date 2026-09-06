@@ -19,6 +19,7 @@ Dokumen ini mencatat bukti engineering yang sudah ada; status fixture tidak dina
 - Worker-of-worker, closed shadow DOM, Windows, non-Chromium, OCR, Lottie, Canvas/WebGL semantic reconstruction, dan website nyata tetap Fase 3.
 - Probe plan saat ini sudah divalidasi dan direkam, tetapi diagnostic runner masih menjalankan canonical fixture run; variasi yang belum dieksekusi tetap limitation, bukan evidence eksperimen.
 - Smoke harness 9 run sudah lulus pada 7 September 2026 dengan adapter proses sintetis: 3 P0 task × 3 condition, seluruh bundle berada di bawah 65.536 byte dan seluruh held-out verifier yang tersedia lulus. Ini membuktikan harness/isolation, bukan agent success model.
+- Orchestration penuh 108 run juga selesai dengan adapter sintetis dan seed 42: 36 run per condition, 27 run unsupported karena verifier tujuh task partial belum tersedia, dan 9 run per condition lulus. Scoped score 25% ini adalah hasil harness, bukan klaim kualitas agent.
 - Matriks penuh 108 run belum dijalankan; tujuh task partial tetap unsupported pada denominator utama sampai verifier-nya tersedia.
 
 ## Gate berikutnya
