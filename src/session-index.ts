@@ -196,7 +196,11 @@ export async function buildSessionIndex(
       }
       database.exec('COMMIT');
     } catch (error) {
-      database.exec('ROLLBACK');
+      try {
+        database.exec('ROLLBACK');
+      } catch {
+        // A quota or I/O failure can terminate the transaction before rollback.
+      }
       throw error;
     }
   } finally {

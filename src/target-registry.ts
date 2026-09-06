@@ -31,6 +31,25 @@ interface RealmSnapshot<T> {
   failure?: string;
 }
 
+async function sampleClock(read: () => Promise<RealmClock>): Promise<{ clock: RealmClock; hostBefore: number; hostReceiveTime: number }> {
+  let best: { clock: RealmClock; hostBefore: number; hostReceiveTime: number } | undefined;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const hostBefore = Date.now();
+    try {
+      const clock = await read();
+      const hostReceiveTime = Date.now();
+      if (!best || hostReceiveTime - hostBefore < best.hostReceiveTime - best.hostBefore) {
+        best = { clock, hostBefore, hostReceiveTime };
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (best) return best;
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 interface RegisteredFrame {
   frame: Frame;
   logicalId: string;
@@ -261,13 +280,16 @@ export class TargetRegistry {
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error);
     }
-    const hostBefore = Date.now();
+    let hostBefore = Date.now();
+    let hostReceiveTime = hostBefore;
     try {
-      clock = await registered.frame.evaluate(() => ({ timeOrigin: performance.timeOrigin, now: performance.now() }));
+      const sample = await sampleClock(() => registered.frame.evaluate(() => ({ timeOrigin: performance.timeOrigin, now: performance.now() })));
+      clock = sample.clock;
+      hostBefore = sample.hostBefore;
+      hostReceiveTime = sample.hostReceiveTime;
     } catch (error) {
       failure ??= error instanceof Error ? error.message : String(error);
     }
-    const hostReceiveTime = Date.now();
     try {
       elements = await registered.frame.locator('[data-wbc-id]').evaluateAll((matches) => {
         const inferRole = (element: Element): string | null => {
@@ -376,10 +398,14 @@ export class TargetRegistry {
         failure = error instanceof Error ? error.message : String(error);
       }
     }
-    const hostBefore = Date.now();
+    let hostBefore = Date.now();
+    let hostReceiveTime = hostBefore;
     if (!failure) {
       try {
-        clock = await registered.worker.evaluate(() => ({ timeOrigin: performance.timeOrigin, now: performance.now() }));
+        const sample = await sampleClock(() => registered.worker.evaluate(() => ({ timeOrigin: performance.timeOrigin, now: performance.now() })));
+        clock = sample.clock;
+        hostBefore = sample.hostBefore;
+        hostReceiveTime = sample.hostReceiveTime;
       } catch (error) {
         failure = error instanceof Error ? error.message : String(error);
       }
@@ -389,7 +415,7 @@ export class TargetRegistry {
       ...(clock ? { clock } : {}),
       checkpointAt: Date.now(),
       hostBefore,
-      hostReceiveTime: Date.now(),
+      hostReceiveTime,
       ...(failure ? { failure } : {}),
     };
   }
