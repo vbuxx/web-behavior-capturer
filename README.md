@@ -38,6 +38,7 @@ pnpm run benchmark:capture -- --overhead-runs 1
 pnpm run benchmark:reliability -- --parallel 2 --cycles 1
 pnpm run benchmark:crash -- --kill-after-ms 15000
 pnpm run cleanup:staging -- --out .wbc/phase1 --max-age-ms 86400000
+pnpm run benchmark:failure
 pnpm run verify -- --contract .wbc/phase1/behavior-contract.json --target reference
 pnpm run verify:replica -- --contract .wbc/phase1/behavior-contract.json
 pnpm run probe -- --out .wbc/phase1/technical-probe-report.json
@@ -102,6 +103,8 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/PHASE-1-FINALIZATION-BENCHMARK-REPORT.md` berisi waktu capture end-to-end dan quality package.
 - `docs/PHASE-1-RELIABILITY-REPORT.md` berisi hasil parallel capture dan isolation check.
 - `docs/PHASE-1-CRASH-REPORT.md` berisi hasil interruption gate dan batas recovery yang masih tersisa.
+- `docs/PHASE-1-FAILURE-REPORT.md` berisi recovery matrix untuk simulated `ENOSPC` writer failure.
+- `docs/decisions/0018-writer-failure-recovery.md` menetapkan fail-closed behavior untuk error normal saat finalisasi.
 - `src/staging.ts` menyediakan janitor age-bounded untuk orphan staging directory setelah hard crash.
 
 ## Batas interpretasi

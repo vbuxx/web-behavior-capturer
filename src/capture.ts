@@ -121,6 +121,13 @@ function round(value: number, digits = 3): number {
   return Number(value.toFixed(digits));
 }
 
+function injectCaptureFailure(stage: 'before-contract' | 'before-index'): void {
+  if (process.env.WBC_CAPTURE_FAILURE_STAGE !== stage) return;
+  const error = new Error(`Injected ENOSPC at capture stage: ${stage}`) as NodeJS.ErrnoException;
+  error.code = 'ENOSPC';
+  throw error;
+}
+
 function durationFrom(snapshot: AnimationSnapshot, fallback = 0): number {
   return snapshot.animations[0]?.timing.duration ?? fallback;
 }
@@ -687,7 +694,9 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
 
     await validateContract(contract);
     const contractPath = join(stagingDirectory, 'behavior-contract.json');
+    injectCaptureFailure('before-contract');
     await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`, 'utf8');
+    injectCaptureFailure('before-index');
     await buildSessionIndex(stagingDirectory, contractPath, contract, recorder.records);
     await context.close();
     await rename(stagingDirectory, absoluteOutput);
