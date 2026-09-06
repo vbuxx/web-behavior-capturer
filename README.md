@@ -152,6 +152,8 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/PHASE-2-VIEWER-REPORT.md` berisi graph/provenance viewer dan batas mismatch rendering.
 - `fixtures/evaluation/fixture-matrix.json` dan `src/evaluation.ts` menyediakan 12-fixture matrix serta evaluasi tiga pengulangan tanpa mengarang agent score.
 - `docs/PHASE-2-EVALUATION-REPORT.md` berisi cara menjalankan evaluasi dan batas baseline A/B/C.
+- `docs/PHASE-1-RELEASE-GATE.md` berisi angka gate aktual, capability status, dan release-candidate gaps.
+- `docs/PHASE-2-STATUS.md` berisi fondasi Milestone 2-5 yang sudah berjalan dan target evaluasi yang belum boleh diklaim.
 - `docs/decisions/0032-phase-2-evaluation-boundary.md` menetapkan pemisahan verifier, agent success, overhead, loss, dan unsupported coverage.
 - `src/staging.ts` menyediakan janitor age-bounded untuk orphan staging directory setelah hard crash.
 
