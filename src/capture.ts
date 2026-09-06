@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { chromium, type Browser, type CDPSession, type Page } from 'playwright';
 import { installPageObserver, measureFrameIntervals } from './browser-observer.js';
@@ -514,7 +514,9 @@ export interface CaptureOptions {
 
 export async function captureSession(outputDirectory: string, options: CaptureOptions = {}): Promise<CaptureResult> {
   const absoluteOutput = resolve(outputDirectory);
-  const evidenceDirectory = join(absoluteOutput, 'evidence');
+  const stagingDirectory = `${absoluteOutput}.staging-${randomUUID()}`;
+  let promoted = false;
+  const evidenceDirectory = join(stagingDirectory, 'evidence');
   const visualDirectory = join(evidenceDirectory, 'visual');
   await mkdir(visualDirectory, { recursive: true });
 
@@ -595,13 +597,13 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     const evidenceIndex = [
       ...recorder.records.map((record) => ({
         id: record.id,
-        path: relative(absoluteOutput, eventPath),
+        path: relative(stagingDirectory, eventPath),
         mediaType: 'application/x-ndjson' as const,
         sha256: eventHash,
       })),
       ...await Promise.all(recorder.files.map(async (file) => ({
         id: file.id,
-        path: relative(absoluteOutput, file.absolutePath),
+        path: relative(stagingDirectory, file.absolutePath),
         mediaType: file.mediaType,
         sha256: await hashFile(file.absolutePath),
       }))),
@@ -684,19 +686,22 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     };
 
     await validateContract(contract);
-    const contractPath = join(absoluteOutput, 'behavior-contract.json');
+    const contractPath = join(stagingDirectory, 'behavior-contract.json');
     await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`, 'utf8');
-    const sessionIndex = await buildSessionIndex(absoluteOutput, contractPath, contract, recorder.records);
+    await buildSessionIndex(stagingDirectory, contractPath, contract, recorder.records);
     await context.close();
+    await rename(stagingDirectory, absoluteOutput);
+    promoted = true;
     return {
       outputDirectory: absoluteOutput,
-      contractPath,
-      eventPath,
-      sessionIndexPath: sessionIndex.databasePath,
-      sessionIndexManifestPath: sessionIndex.manifestPath,
+      contractPath: join(absoluteOutput, 'behavior-contract.json'),
+      eventPath: join(absoluteOutput, 'evidence', 'events.jsonl'),
+      sessionIndexPath: join(absoluteOutput, 'session.sqlite'),
+      sessionIndexManifestPath: join(absoluteOutput, 'session-index.json'),
       contract,
     };
   } finally {
+    if (!promoted) await rm(stagingDirectory, { recursive: true, force: true });
     await browser.close();
     await server.close();
   }

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { mkdtemp, readdir, rm, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspectSessionPackage } from './session-index.js';
 
@@ -10,6 +10,7 @@ export interface CrashInjectionResult {
   childExitCode: number | null;
   partialOutputExists: boolean;
   partialFileCount: number;
+  partialStagingDirectoryCount: number;
   rejectedByIntegrity: boolean;
   rejectionMessage: string;
 }
@@ -19,6 +20,21 @@ async function fileCount(directory: string): Promise<number> {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     count += entry.isDirectory() ? await fileCount(join(directory, entry.name)) : 1;
   }
+  return count;
+}
+
+async function stagingDirectories(outputDirectory: string): Promise<string[]> {
+  const parent = dirname(outputDirectory);
+  const prefix = `${basename(outputDirectory)}.staging-`;
+  return (await readdir(parent, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix))
+    .map((entry) => join(parent, entry.name));
+}
+
+async function stagingFileCount(outputDirectory: string): Promise<number> {
+  const directories = await stagingDirectories(outputDirectory);
+  let count = 0;
+  for (const directory of directories) count += await fileCount(directory);
   return count;
 }
 
@@ -46,7 +62,7 @@ export async function runCrashInjection(killAfterMs = 1_000): Promise<CrashInjec
   const partialPoll = setInterval(async () => {
     if (killed) return;
     try {
-      if (await fileCount(outputDirectory) > 0) kill();
+      if (await stagingFileCount(outputDirectory) > 0) kill();
     } catch {
       // The child may have exited while the temporary directory is being cleaned up.
     }
@@ -62,15 +78,20 @@ export async function runCrashInjection(killAfterMs = 1_000): Promise<CrashInjec
     rejectedByIntegrity = true;
     rejectionMessage = error instanceof Error ? error.message : String(error);
   }
-  const partialFileCount = await fileCount(outputDirectory);
-  const partialOutputExists = (await stat(outputDirectory)).isDirectory() && partialFileCount > 0;
+  const partialFileCount = await stagingFileCount(outputDirectory);
+  const partialStagingDirectories = await stagingDirectories(outputDirectory);
+  const partialOutputExists = partialFileCount > 0;
+  const outputExists = (await stat(outputDirectory)).isDirectory();
+  if (!outputExists) throw new Error('Crash benchmark output directory disappeared unexpectedly');
   await rm(outputDirectory, { recursive: true, force: true });
+  for (const directory of partialStagingDirectories) await rm(directory, { recursive: true, force: true });
   return {
     killAfterMs,
     childExitSignal: result.signal,
     childExitCode: result.code,
     partialOutputExists,
     partialFileCount,
+    partialStagingDirectoryCount: partialStagingDirectories.length,
     rejectedByIntegrity,
     rejectionMessage,
   };

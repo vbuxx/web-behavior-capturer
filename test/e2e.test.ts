@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { appendFile, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import test from 'node:test';
 import { chromium } from 'playwright';
 import { captureSession } from '../src/capture.js';
@@ -15,6 +15,8 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
   const temporaryDirectory = await mkdtemp(join(tmpdir(), 'wbc-phase0-'));
   try {
     const capture = await captureSession(temporaryDirectory);
+    const stagingOrphans = (await readdir(dirname(temporaryDirectory))).filter((entry) => entry.startsWith(`${basename(temporaryDirectory)}.staging-`));
+    assert.equal(stagingOrphans.length, 0);
     const contract = await validateContract(JSON.parse(await readFile(capture.contractPath, 'utf8')));
     assert.equal(contract.schemaVersion, '1.5.0');
     assert.equal(contract.manifest.redaction.policyVersion, '1.0.0');

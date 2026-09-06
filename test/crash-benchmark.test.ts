@@ -8,6 +8,7 @@ test('does not promote a capture interrupted before finalization', { timeout: 30
   assert.equal(result.childExitCode, null);
   assert.equal(result.partialOutputExists, true);
   assert.ok(result.partialFileCount > 0);
+  assert.ok(result.partialStagingDirectoryCount > 0);
   assert.equal(result.rejectedByIntegrity, true);
   assert.match(result.rejectionMessage, /session-index\.json|checksum|schema|manifest/i);
 });

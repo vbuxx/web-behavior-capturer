@@ -14,7 +14,7 @@ Lima perilaku yang menjadi exit criterion spike sudah dapat ditangkap dan diveri
 - scroll reveal dengan reverse probe;
 - GSAP ScrollTrigger dengan `scrub: true`.
 
-Fase 0 telah selesai. Fase 1 sekarang membawa target registry, lifecycle lintas navigasi, reopenable session index, structured-data redaction, budgeted evidence query, element identity lintas frame, resolver struktural independen, serta review UI lokal. Behavior Contract schema 1.5.0 mencatat target/navigation epoch, loss, redaction, locator candidates, bounds, structural fingerprint, dan ambiguity. SQLite sidecar menyediakan query tanpa membuka website sumber.
+Fase 0 telah selesai. Fase 1 sekarang membawa target registry, lifecycle lintas navigasi, reopenable session index, structured-data redaction, budgeted evidence query, element identity lintas frame, resolver struktural independen, review UI lokal, serta atomic staging/promotion untuk package capture. Behavior Contract schema 1.5.0 mencatat target/navigation epoch, loss, redaction, locator candidates, bounds, structural fingerprint, dan ambiguity. SQLite sidecar menyediakan query tanpa membuka website sumber.
 
 Hasil terbaru tersedia di [artifacts/phase1/latest/behavior-contract.json](artifacts/phase1/latest/behavior-contract.json), [artifacts/phase1/latest/verification-reference.json](artifacts/phase1/latest/verification-reference.json), [artifacts/phase1/latest/verification-replica.json](artifacts/phase1/latest/verification-replica.json), dan [artifacts/phase1/latest/technical-probe-report.json](artifacts/phase1/latest/technical-probe-report.json). Kedua target verifikasi lulus 5/5 dan technical probe diagnostik lulus 10/10. Baseline Fase 0 tetap disimpan di `artifacts/phase0/latest`.
 
