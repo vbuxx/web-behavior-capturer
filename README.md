@@ -51,6 +51,14 @@ pnpm run recover:rotation -- --archive-dir .wbc/archive --apply
 pnpm run verify -- --contract .wbc/phase1/behavior-contract.json --target reference
 pnpm run verify:replica -- --contract .wbc/phase1/behavior-contract.json
 pnpm run probe -- --out .wbc/phase1/technical-probe-report.json
+pnpm run capture-start -- --out .wbc/sessions/manual
+pnpm run capture-status -- --job JOB_ID
+pnpm run capture-stop -- --job JOB_ID
+pnpm run behavior-list -- --package artifacts/phase1/latest --limit 10
+pnpm run evidence-get -- --package artifacts/phase1/latest --type mutation --limit 20 --byte-budget 65536
+pnpm run replica-verify -- --package artifacts/phase1/latest
+pnpm run capture-export -- --source artifacts/phase1/latest --destination .wbc/exported
+printf '%s\n' '{"id":1,"method":"behavior.list","params":{"packagePath":"artifacts/phase1/latest","limit":1}}' | pnpm run mcp
 pnpm test
 ```
 
@@ -71,6 +79,8 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `src/visual-redaction.ts` memvalidasi policy selector dan mask screenshot sebelum persistence; `schema/visual-redaction-policy.schema.json` mendefinisikan policy 1.0.0.
 - `src/locator-resolver.ts` mencocokkan elemen replika dari fingerprint struktural dan menolak confidence yang ambigu.
 - `src/review-server.ts` menyajikan session API dan viewer read-only hanya pada loopback setelah integrity verification.
+- `src/session-service.ts` adalah service core bersama CLI/MCP untuk job lifecycle, immutable snapshot, query berbujet, probe, verify, dan export.
+- `src/mcp-server.ts` menyediakan MCP stdio lokal; tidak membuka debug browser atau network listener publik.
 - `src/verify.ts` menjalankan skenario held-out terhadap fixture baru.
 - `src/scenarios.ts` memvalidasi dan membaca suite skenario JSON berversi.
 - `src/browser-observer.ts` memasang page-world observer sebelum script fixture.
@@ -135,6 +145,8 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0028-visual-and-network-privacy.md` menetapkan selector masking dan larangan network header/body capture.
 - `docs/decisions/0029-evidence-graph-and-revision.md` menetapkan graph revision, provenance edge, dan explicit unknown boundary.
 - `docs/PHASE-2-EVIDENCE-GRAPH-REPORT.md` berisi hasil graph foundation dan scope boundary.
+- `docs/decisions/0030-session-service-and-stdio-mcp.md` menetapkan shared service/job store dan MCP local-only.
+- `docs/PHASE-2-SERVICE-REPORT.md` berisi operasi service, integrity snapshot, dan batas local job store.
 - `src/staging.ts` menyediakan janitor age-bounded untuk orphan staging directory setelah hard crash.
 
 ## Batas interpretasi

@@ -30,6 +30,29 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === 'capture-start') {
+    const { SessionService } = await import('./session-service.js');
+    const service = new SessionService();
+    const outputPath = option('--out');
+    const maxRecords = option('--max-records');
+    const visualPolicyPath = option('--visual-policy');
+    console.log(JSON.stringify(await service.startCapture({
+      ...(outputPath ? { outputPath } : {}),
+      ...(maxRecords ? { maxRecords: Number(maxRecords) } : {}),
+      ...(visualPolicyPath ? { visualPolicyPath } : {}),
+    }), null, 2));
+    return;
+  }
+
+  if (command === 'capture-status' || command === 'capture-stop') {
+    const { SessionService } = await import('./session-service.js');
+    const service = new SessionService();
+    const jobId = option('--job') ?? process.argv[3];
+    if (!jobId) throw new Error('--job is required');
+    console.log(JSON.stringify(command === 'capture-stop' ? await service.stopCapture(jobId) : await service.status(jobId), null, 2));
+    return;
+  }
+
   if (command === 'inspect') {
     const { inspectSessionPackage } = await import('./session-index.js');
     const packageDirectory = resolve(option('--package') ?? '.wbc/phase1');
@@ -80,6 +103,32 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === 'behavior-list' || command === 'behavior-get' || command === 'evidence-get') {
+    const { SessionService } = await import('./session-service.js');
+    const service = new SessionService();
+    const packagePath = option('--package') ?? 'artifacts/phase1/latest';
+    if (command === 'behavior-list') {
+      const kind = option('--kind');
+      console.log(JSON.stringify(await service.listBehaviors(packagePath, { ...(kind ? { kind: kind as never } : {}), ...(option('--limit') ? { limit: Number(option('--limit')) } : {}), ...(option('--offset') ? { offset: Number(option('--offset')) } : {}) }), null, 2));
+    } else if (command === 'behavior-get') {
+      const behaviorId = option('--behavior') ?? process.argv[3];
+      if (!behaviorId) throw new Error('--behavior is required');
+      console.log(JSON.stringify(await service.getBehavior(packagePath, behaviorId), null, 2));
+    } else {
+      const type = option('--type');
+      const limit = option('--limit');
+      const byteBudget = option('--byte-budget');
+      const cursor = option('--cursor');
+      console.log(JSON.stringify(await service.getEvidence(packagePath, {
+        ...(type ? { type } : {}),
+        ...(limit ? { limit: Number(limit) } : {}),
+        ...(byteBudget ? { byteBudget: Number(byteBudget) } : {}),
+        ...(cursor ? { cursor } : {}),
+      }), null, 2));
+    }
+    return;
+  }
+
   if (command === 'verify') {
     const { verifyPhase0 } = await import('./verify.js');
     const contract = resolve(option('--contract') ?? '.wbc/phase1/behavior-contract.json');
@@ -104,6 +153,27 @@ async function main(): Promise<void> {
     const result = await runTechnicalProbes(report);
     console.log(JSON.stringify({ status: result.summary.failed === 0 ? 'passed' : 'failed', report, summary: result.summary }, null, 2));
     if (result.summary.failed > 0) process.exitCode = 1;
+    return;
+  }
+
+  if (command === 'probe-run') {
+    const { SessionService } = await import('./session-service.js');
+    console.log(JSON.stringify(await new SessionService().runProbe(), null, 2));
+    return;
+  }
+
+  if (command === 'replica-verify') {
+    const { SessionService } = await import('./session-service.js');
+    console.log(JSON.stringify(await new SessionService().verifyReplica(option('--package') ?? 'artifacts/phase1/latest'), null, 2));
+    return;
+  }
+
+  if (command === 'capture-export') {
+    const { SessionService } = await import('./session-service.js');
+    const source = option('--source') ?? option('--package');
+    const destination = option('--destination') ?? option('--out');
+    if (!source || !destination) throw new Error('--source and --destination are required');
+    console.log(JSON.stringify(await new SessionService().exportCapture(source, destination), null, 2));
     return;
   }
 
@@ -217,7 +287,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error('Usage: tsx src/cli.ts <capture|verify|probe|inspect|query|evidence|review|benchmark|browser-benchmark|capture-benchmark|reliability-benchmark|crash-benchmark|cleanup-staging|failure-benchmark|corruption-benchmark|rotate-package|rotation-recover|quota-benchmark|prune-archives|cleanup-rotation> [--out PATH] [--package PATH] [--archive-dir PATH] [--keep N] [--apply] [--quota-blocks N] [--copy-fallback] [--visual-policy PATH] [--port N] [--parallel N] [--cycles N] [--kill-after-ms N] [--max-age-ms N] [--iterations N] [--synthetic] [--records N] [--evidence-mb N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
+  console.error('Usage: tsx src/cli.ts <capture|capture-start|capture-status|capture-stop|capture-export|verify|replica-verify|probe|probe-run|inspect|query|evidence|behavior-list|behavior-get|evidence-get|review|benchmark|browser-benchmark|capture-benchmark|reliability-benchmark|crash-benchmark|cleanup-staging|failure-benchmark|corruption-benchmark|rotate-package|rotation-recover|quota-benchmark|prune-archives|cleanup-rotation> [--out PATH] [--source PATH] [--destination PATH] [--package PATH] [--archive-dir PATH] [--job ID] [--behavior ID] [--keep N] [--apply] [--quota-blocks N] [--copy-fallback] [--visual-policy PATH] [--port N] [--parallel N] [--cycles N] [--kill-after-ms N] [--max-age-ms N] [--iterations N] [--synthetic] [--records N] [--evidence-mb N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
   process.exitCode = 2;
 }
 
