@@ -111,7 +111,7 @@ async function directorySha256(root: string): Promise<string> {
 
 async function preflightBundle(root: string, condition: EvaluationCondition, task: EvaluationTask, evidenceByteBudget: number): Promise<{ bytes: number; sha256: string }> {
   const forbiddenName = /(events\.jsonl|headers?|bodies?|cookie|authorization|credential|secret|token)/i;
-  const forbiddenContent = /(authorization\s*[:=]|cookie\s*[:=]|set-cookie|bearer\s+[a-z0-9._-]+|WBC_EVAL_CANARY_[A-Z0-9]+)/i;
+  const forbiddenContent = /(authorization\s*[:=]|cookie\s*[:=]|set-cookie|bearer\s+[a-z0-9._-]+|(?:headers?|body)\s*[:=]|password\s*[:=]|api[_-]?key\s*[:=]|WBC_EVAL_CANARY_[A-Z0-9]+)/i;
   const textExtensions = new Set(['.json', '.jsonl', '.txt', '.html', '.js', '.css', '.md']);
   const files: string[] = [];
   const walk = async (directory: string): Promise<void> => {
@@ -170,8 +170,11 @@ async function buildConditionWorkspace(packageRoot: string, contract: ContractPa
     const records = eventsEntry
       ? (await readFile(resolve(packageRoot, eventsEntry.path), 'utf8')).split('\n').filter(Boolean).map((line) => JSON.parse(line) as { type: string; source: string; targetRef?: string; payload: Record<string, unknown> })
       : [];
-    await writeJson(join(evidenceRoot, 'trace-summary.json'), records.filter((record) => ['input', 'mutation', 'animation-started', 'animation-canceled', 'network-response'].includes(record.type)).map(({ type, source, targetRef, payload }) => ({ type, source, targetRef: targetRef ?? null, payload })));
-    await writeJson(join(evidenceRoot, 'dom-action-evidence.json'), records.filter((record) => ['input', 'mutation', 'observable-state-fingerprint'].includes(record.type)));
+    const compactPayload = (payload: Record<string, unknown>): Record<string, unknown> => Object.fromEntries(Object.entries(payload)
+      .filter(([key, value]) => !/(snapshot|keyframes|headers?|body)/i.test(key) && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null))
+      .slice(0, 24));
+    await writeJson(join(evidenceRoot, 'trace-summary.json'), records.filter((record) => ['input', 'mutation', 'animation-started', 'animation-canceled', 'network-response'].includes(record.type)).slice(0, 120).map(({ type, source, targetRef, payload }) => ({ type, source, targetRef: targetRef ?? null, payload: compactPayload(payload) })));
+    await writeJson(join(evidenceRoot, 'dom-action-evidence.json'), records.filter((record) => ['input', 'mutation', 'observable-state-fingerprint'].includes(record.type)).slice(0, 120).map(({ type, source, targetRef, payload }) => ({ type, source, targetRef: targetRef ?? null, payload: compactPayload(payload) })));
   } else {
     const graphPath = contract.manifest.evidenceGraph?.path;
     const graph = graphPath ? JSON.parse(await readFile(resolve(packageRoot, graphPath), 'utf8')) : { nodes: [], edges: [], limitations: [] };
