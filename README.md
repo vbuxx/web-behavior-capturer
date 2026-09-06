@@ -27,6 +27,7 @@ pnpm install
 pnpm exec playwright install chromium
 pnpm run build
 pnpm run capture -- --out .wbc/phase1
+pnpm run capture -- --out .wbc/phase1 --visual-policy .wbc/visual-redaction-policy.json
 pnpm run inspect -- --package .wbc/phase1
 pnpm run query -- --package .wbc/phase1 --kind gsap_scrub --limit 10
 pnpm run evidence -- --package .wbc/phase1 --type mutation --limit 20 --byte-budget 65536
@@ -67,6 +68,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `src/target-registry.ts` membentuk pohon frame/worker serta coverage, clock, dan loss per target.
 - `src/session-index.ts` membangun, membuka ulang, dan memverifikasi SQLite sidecar serta query behavior terfilter.
 - `src/redaction.ts` menghapus credential terstruktur sebelum data masuk JSONL, contract, atau SQLite.
+- `src/visual-redaction.ts` memvalidasi policy selector dan mask screenshot sebelum persistence; `schema/visual-redaction-policy.schema.json` mendefinisikan policy 1.0.0.
 - `src/locator-resolver.ts` mencocokkan elemen replika dari fingerprint struktural dan menolak confidence yang ambigu.
 - `src/review-server.ts` menyajikan session API dan viewer read-only hanya pada loopback setelah integrity verification.
 - `src/verify.ts` menjalankan skenario held-out terhadap fixture baru.
@@ -124,10 +126,12 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0024-cross-filesystem-rotation.md` menetapkan copy + verify + remove fallback untuk archive lintas filesystem.
 - `docs/PHASE-1-ROTATION-STAGING-REPORT.md` berisi janitor age-bounded untuk orphan rotation staging.
 - `docs/PHASE-1-SCHEMA-LIFECYCLE-REPORT.md` berisi compatibility schema 1.6 dan cancellation state gate.
+- `docs/PHASE-1-PRIVACY-REPORT.md` berisi visual masking dan network metadata-only boundary.
 - `docs/decisions/0025-rotation-staging-recovery.md` menetapkan cleanup terpisah dari archive retention.
 - `src/rotation-recovery.ts` menyimpan marker rotation berversi dan recovery dry-run/apply; source hanya dihapus setelah archive identity dan checksum terverifikasi.
 - `docs/decisions/0018-writer-failure-recovery.md` menetapkan fail-closed behavior untuk error normal saat finalisasi.
 - `docs/decisions/0027-schema-1-6-lifecycle-state.md` menetapkan additive schema 1.6 dan state cancellation fail-closed.
+- `docs/decisions/0028-visual-and-network-privacy.md` menetapkan selector masking dan larangan network header/body capture.
 - `src/staging.ts` menyediakan janitor age-bounded untuk orphan staging directory setelah hard crash.
 
 ## Batas interpretasi

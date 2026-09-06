@@ -8,6 +8,7 @@ import { buildSessionIndex } from './session-index.js';
 import { TargetRegistry } from './target-registry.js';
 import { Redactor } from './redaction.js';
 import { validateContract } from './validate.js';
+import { loadVisualRedactionPolicy, screenshotWithVisualMask, type VisualRedactionPolicy } from './visual-redaction.js';
 import type {
   Behavior,
   CaptureSessionState,
@@ -47,7 +48,10 @@ class EvidenceRecorder {
   readonly files: EvidenceFile[] = [];
   #sequence = 0;
 
-  constructor(private readonly redactor: Redactor) {}
+  #maskedScreenshots = 0;
+  #maskedSelectors = new Set<string>();
+
+  constructor(private readonly redactor: Redactor, private readonly visualPolicy: VisualRedactionPolicy) {}
 
   record(
     source: EvidenceRecord['source'],
@@ -102,9 +106,20 @@ class EvidenceRecorder {
       if (right <= x || bottom <= y) throw new Error('Target is outside the current viewport');
       return { x, y, width: right - x, height: bottom - y };
     });
-    await page.screenshot({ path, animations: 'allow', clip });
+    const maskedSelectors = await screenshotWithVisualMask(page, path, clip, this.visualPolicy);
+    if (maskedSelectors.length > 0) this.#maskedScreenshots += 1;
+    for (const maskedSelector of maskedSelectors) this.#maskedSelectors.add(maskedSelector);
     this.files.push({ id, absolutePath: path, mediaType: 'image/png' });
     return id;
+  }
+
+  visualRedactionSummary(screenshotCount: number): { policyVersion: '1.0.0'; maskedScreenshots: number; maskedSelectors: string[]; unmaskedScreenshots: number } {
+    return {
+      policyVersion: '1.0.0',
+      maskedScreenshots: this.#maskedScreenshots,
+      maskedSelectors: [...this.#maskedSelectors].sort(),
+      unmaskedScreenshots: Math.max(0, screenshotCount - this.#maskedScreenshots),
+    };
   }
 }
 
@@ -520,6 +535,7 @@ export interface CaptureOptions {
   overheadRuns?: number;
   signal?: AbortSignal;
   onStateChange?: (state: CaptureSessionState) => void;
+  visualPolicyPath?: string;
 }
 
 export class CaptureCancelledError extends Error {
@@ -553,7 +569,8 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
   const server = await startFixtureServer();
   const browser = await chromium.launch({ headless: true, args: ['--site-per-process'] });
   const redactor = new Redactor();
-  const recorder = new EvidenceRecorder(redactor);
+  const visualPolicy = await loadVisualRedactionPolicy(options.visualPolicyPath);
+  const recorder = new EvidenceRecorder(redactor, visualPolicy);
   let targetRegistry: TargetRegistry | undefined;
   try {
     throwIfCancelled();
@@ -570,6 +587,25 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     targetRegistry = new TargetRegistry(page, options.maxPageRecords ?? 10_000);
     targetRegistry.startStreaming({ flushIntervalMs: 50, batchSize: 128, queueCapacity: 10_000 });
     const cdp: CDPSession = await context.newCDPSession(page);
+    page.on('request', (request) => {
+      recorder.record('cdp', 'network-request', {
+        url: request.url(),
+        method: request.method(),
+        resourceType: request.resourceType(),
+      });
+    });
+    page.on('response', (response) => {
+      const timing = response.request().timing();
+      recorder.record('cdp', 'network-response', {
+        url: response.url(),
+        status: response.status(),
+        resourceType: response.request().resourceType(),
+        timing: {
+          startTime: timing.startTime,
+          responseEnd: timing.responseEnd,
+        },
+      });
+    });
     let cdpAnimationSupported = true;
     try {
       await cdp.send('Animation.enable');
@@ -683,6 +719,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           { name: 'recursive_worker_collector', status: 'unavailable', detail: 'Workers spawned by another worker are not recursively instrumented.' },
           { name: 'sqlite_session_index', status: 'supported', detail: 'Reopenable sidecar index built with node:sqlite; runtime API is still marked experimental.' },
           { name: 'structured_data_redaction', status: 'supported', detail: 'Sensitive keys, header-style values, bearer tokens, and credential query parameters are redacted before persistence.' },
+          { name: 'network_metadata_only', status: 'supported', detail: 'URL, method, status, resource type, and timing only; request/response headers and bodies are disabled.' },
           { name: 'visual_redaction', status: 'not_attempted', detail: 'Screenshot regions are not OCR-scanned or blurred.' },
           { name: 'target_scoped_element_registry', status: 'supported', detail: 'Element identity, bounds, locator candidates, and ambiguity are scoped to target and navigation epoch.' },
           { name: 'independent_structural_locator', status: 'supported', detail: 'Verifier scores structural and layout fingerprints and rejects weak or ambiguous matches without requiring shared source IDs.' },
@@ -706,10 +743,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           },
         },
         visualRedaction: {
-          policyVersion: '1.0.0',
-          maskedScreenshots: 0,
-          maskedSelectors: [],
-          unmaskedScreenshots: recorder.files.filter((file) => file.mediaType === 'image/png').length,
+          ...recorder.visualRedactionSummary(recorder.files.filter((file) => file.mediaType === 'image/png').length),
         },
         gaps: [
           'Only one deterministic local route is covered.',
@@ -723,6 +757,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           'Observer overhead benchmark includes page-world frame observers but not the host registry or worker collector installation.',
           'The SQLite API is experimental in the pinned Node.js runtime; the sidecar format may require migration before release.',
           'Redaction covers structured evidence and URL query parameters; visual evidence and arbitrary text content are not redacted.',
+          'Network evidence intentionally excludes headers and bodies; request/response payload semantics are unknown.',
           'Locator candidates exclude visible text; ordinal identity for fully ambiguous elements may drift after DOM reordering.',
           'Independent structural resolution is heuristic; major layout reordering or many visually identical candidates can be rejected as ambiguous.',
           'No MCP server is included; the local viewer is read-only and does not yet render the visual evidence gallery.',

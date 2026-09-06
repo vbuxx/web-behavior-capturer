@@ -114,6 +114,8 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
     assert.match(events, /"type":"interruption-leave"/);
     assert.match(events, /"type":"gsap-scrub-sample"/);
     assert.match(events, /"type":"target-coverage"/);
+    assert.match(events, /"type":"network-request"/);
+    assert.match(events, /"type":"network-response"/);
     assert.match(events, /"sourceTargetId":"nav-1:frame-/);
     assert.doesNotMatch(events, /fixture-secret/);
     assert.equal((await readFile(capture.sessionIndexPath)).includes(Buffer.from('fixture-secret')), false);
