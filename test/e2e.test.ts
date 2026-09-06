@@ -3,7 +3,9 @@ import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { chromium } from 'playwright';
 import { captureSession } from '../src/capture.js';
+import { resolveContractElement } from '../src/locator-resolver.js';
 import { runTechnicalProbes } from '../src/probes.js';
 import { inspectSessionPackage, querySessionBehaviors, querySessionRecords } from '../src/session-index.js';
 import { validateContract } from '../src/validate.js';
@@ -14,7 +16,7 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
   try {
     const capture = await captureSession(temporaryDirectory);
     const contract = await validateContract(JSON.parse(await readFile(capture.contractPath, 'utf8')));
-    assert.equal(contract.schemaVersion, '1.4.0');
+    assert.equal(contract.schemaVersion, '1.5.0');
     assert.equal(contract.manifest.redaction.policyVersion, '1.0.0');
     assert.ok(contract.manifest.redaction.redactedValues > 0);
     assert.ok(contract.manifest.redaction.categories.includes('token'));
@@ -68,6 +70,8 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
     )));
     assert.ok(contract.elements.some((element) => element.targetId === lifecycleA?.targetId));
     assert.ok(contract.elements.some((element) => element.targetId === lifecycleB?.targetId));
+    assert.ok(contract.elements.every((element) => element.structuralFingerprint.tagName.length > 0));
+    assert.ok(contract.elements.every((element) => element.structuralFingerprint.documentProgress >= 0));
     const ambiguousElements = contract.elements.filter((element) => element.dataWbcId === 'ambiguous-action');
     assert.equal(ambiguousElements.length, 2);
     assert.ok(ambiguousElements.every((element) => element.ambiguity.status === 'ambiguous'));
@@ -151,8 +155,28 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
     const replicaReport = await verifyPhase0(capture.contractPath, { target: 'replica' });
     assert.deepEqual(replicaReport.summary, { passed: 5, failed: 0, total: 5 });
     assert.equal(replicaReport.targetLabel, 'replica');
-    assert.ok(replicaReport.heldOutConditions.includes('Independent markup and no GSAP runtime'));
+    assert.ok(replicaReport.heldOutConditions.includes('Independent markup, no shared capture IDs, and no GSAP runtime'));
     assert.ok(replicaReport.checks.every((check) => check.mismatches.length === 0));
+    assert.ok(replicaReport.checks.every((check) => check.metrics.locatorStrategy === 'structural_fingerprint'));
+    assert.doesNotMatch(await readFile(join(process.cwd(), 'fixtures/replica/index.html'), 'utf8'), /data-wbc-id/);
+    assert.doesNotMatch(await readFile(join(process.cwd(), 'fixtures/replica/replica.js'), 'utf8'), /data-wbc-id/);
+
+    const ambiguityBrowser = await chromium.launch({ headless: true });
+    try {
+      const ambiguityPage = await ambiguityBrowser.newPage({ viewport: { width: 1100, height: 740 } });
+      await ambiguityPage.addInitScript('globalThis.__name = globalThis.__name || ((target) => target);');
+      await ambiguityPage.setContent(`
+        <style>button { position: absolute; inset: 120px auto auto 120px; width: 280px; height: 92px; transition: transform 240ms; }</style>
+        <button type="button">Candidate A</button><button type="button">Candidate B</button>
+      `);
+      const hoverBehavior = contract.behaviors.find((behavior) => behavior.kind === 'hover')!;
+      await assert.rejects(
+        resolveContractElement(ambiguityPage, contract, hoverBehavior.targetRef),
+        /Ambiguous structural locator/,
+      );
+    } finally {
+      await ambiguityBrowser.close();
+    }
 
     await appendFile(capture.sessionIndexPath, 'tampered', 'utf8');
     await assert.rejects(inspectSessionPackage(temporaryDirectory), /Session index checksum mismatch/);

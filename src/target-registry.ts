@@ -24,7 +24,7 @@ interface RealmClock {
 interface RealmSnapshot<T> {
   observer?: T;
   clock?: RealmClock;
-  elements?: Array<Pick<ElementRef, 'dataWbcId' | 'instanceOrdinal' | 'bounds' | 'locatorCandidates' | 'ambiguity'>>;
+  elements?: Array<Pick<ElementRef, 'dataWbcId' | 'instanceOrdinal' | 'bounds' | 'structuralFingerprint' | 'locatorCandidates' | 'ambiguity'>>;
   checkpointAt: number;
   hostBefore: number;
   hostReceiveTime: number;
@@ -278,6 +278,8 @@ export class TargetRegistry {
           if (element instanceof HTMLInputElement) return element.type === 'checkbox' ? 'checkbox' : 'textbox';
           return null;
         };
+        const allElements = [...document.body.querySelectorAll('*')];
+        const documentHeight = Math.max(document.documentElement.scrollHeight, 1);
         return matches.map((element) => {
           const htmlElement = element as HTMLElement;
           const dataWbcId = htmlElement.dataset.wbcId ?? '';
@@ -313,10 +315,29 @@ export class TargetRegistry {
           });
           const preferred = candidates[0]!;
           const rect = element.getBoundingClientRect();
+          const computed = getComputedStyle(element);
+          const transitionDurations = computed.transitionDuration.split(',').map((value) => {
+            const trimmed = value.trim();
+            return trimmed.endsWith('ms') ? Number.parseFloat(trimmed) : Number.parseFloat(trimmed) * 1000;
+          });
+          let depth = 0;
+          for (let current = element.parentElement; current; current = current.parentElement) depth += 1;
           return {
             dataWbcId,
             instanceOrdinal: duplicateElements.indexOf(element) + 1,
             bounds: { x: rect.x + scrollX, y: rect.y + scrollY, width: rect.width, height: rect.height },
+            structuralFingerprint: {
+              tagName: element.tagName.toLowerCase(),
+              role,
+              depth,
+              childElementCount: element.childElementCount,
+              documentOrder: allElements.indexOf(element),
+              documentProgress: (rect.top + scrollY) / documentHeight,
+              widthRatio: rect.width / Math.max(document.documentElement.clientWidth, 1),
+              heightPx: rect.height,
+              hasTransition: transitionDurations.some((duration) => duration > 0),
+              transitionDurationMs: Math.max(0, ...transitionDurations.filter(Number.isFinite)),
+            },
             locatorCandidates: candidates,
             ambiguity: {
               status: preferred.matchCount === 1 ? 'unique' as const : 'ambiguous' as const,

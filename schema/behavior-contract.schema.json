@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://wbc.local/schema/behavior-contract-1.4.0.json",
+  "$id": "https://wbc.local/schema/behavior-contract-1.5.0.json",
   "title": "Website Behavior Capture Contract Package",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "manifest", "elements", "behaviors", "evidenceIndex"],
   "properties": {
-    "schemaVersion": { "const": "1.4.0" },
+    "schemaVersion": { "const": "1.5.0" },
     "manifest": { "$ref": "#/$defs/manifest" },
     "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } },
     "behaviors": {
@@ -106,7 +106,7 @@
       "required": ["productVersion", "schemaVersion", "sessionId", "navigationId", "generatedAt", "source", "environment", "captureMode", "capabilities", "targetCoverage", "redaction", "quality", "gaps"],
       "properties": {
         "productVersion": { "type": "string" },
-        "schemaVersion": { "const": "1.4.0" },
+        "schemaVersion": { "const": "1.5.0" },
         "sessionId": { "type": "string" },
         "navigationId": { "type": "string" },
         "generatedAt": { "type": "string", "format": "date-time" },
@@ -152,7 +152,7 @@
     "element": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "navigationId", "targetId", "frame", "coordinateSpace", "selector", "dataWbcId", "instanceOrdinal", "bounds", "locatorCandidates", "ambiguity"],
+      "required": ["id", "navigationId", "targetId", "frame", "coordinateSpace", "selector", "dataWbcId", "instanceOrdinal", "bounds", "structuralFingerprint", "locatorCandidates", "ambiguity"],
       "properties": {
         "id": { "type": "string" },
         "navigationId": { "type": "string" },
@@ -169,6 +169,23 @@
           "properties": {
             "x": { "type": "number" }, "y": { "type": "number" },
             "width": { "type": "number", "minimum": 0 }, "height": { "type": "number", "minimum": 0 }
+          }
+        },
+        "structuralFingerprint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tagName", "role", "depth", "childElementCount", "documentOrder", "documentProgress", "widthRatio", "heightPx", "hasTransition", "transitionDurationMs"],
+          "properties": {
+            "tagName": { "type": "string", "minLength": 1 },
+            "role": { "type": ["string", "null"] },
+            "depth": { "type": "integer", "minimum": 0 },
+            "childElementCount": { "type": "integer", "minimum": 0 },
+            "documentOrder": { "type": "integer", "minimum": 0 },
+            "documentProgress": { "type": "number", "minimum": 0 },
+            "widthRatio": { "type": "number", "minimum": 0 },
+            "heightPx": { "type": "number", "minimum": 0 },
+            "hasTransition": { "type": "boolean" },
+            "transitionDurationMs": { "type": "number", "minimum": 0 }
           }
         },
         "locatorCandidates": {

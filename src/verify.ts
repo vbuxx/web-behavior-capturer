@@ -9,6 +9,7 @@ import {
   type VerificationScenario,
 } from './scenarios.js';
 import { startFixtureServer } from './server.js';
+import { resolveContractElement, type LocatorResolution } from './locator-resolver.js';
 import { validateContract } from './validate.js';
 import type { Behavior, ContractPackage, VerificationCheck, VerificationReport } from './types.js';
 
@@ -47,13 +48,6 @@ function behaviorForScenario(contract: ContractPackage, scenario: VerificationSc
   return behavior;
 }
 
-function selectorForRef(contract: ContractPackage, ref: string): string {
-  const element = contract.elements.find((candidate) => candidate.id === ref);
-  if (!element) throw new Error(`Cannot resolve contract element ${ref}`);
-  const escaped = element.dataWbcId.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
-  return `[data-wbc-id="${escaped}"]`;
-}
-
 async function style(page: Page, selector: string): Promise<ObservedStyle> {
   return page.locator(selector).evaluate((element) => {
     const computed = getComputedStyle(element);
@@ -81,8 +75,7 @@ async function scrollToAndSample(page: Page, selector: string, y: number): Promi
   return style(page, selector);
 }
 
-async function verifyHover(page: Page, contract: ContractPackage, behavior: Behavior, scenario: VerificationScenario): Promise<VerificationCheck> {
-  const selector = selectorForRef(contract, behavior.targetRef);
+async function verifyHover(page: Page, selector: string, behavior: Behavior, scenario: VerificationScenario): Promise<VerificationCheck> {
   await page.locator(selector).scrollIntoViewIfNeeded();
   await settleScroll(page);
   await page.mouse.move(2, 2);
@@ -108,9 +101,7 @@ async function verifyHover(page: Page, contract: ContractPackage, behavior: Beha
   };
 }
 
-async function verifyCssAnimation(page: Page, contract: ContractPackage, behavior: Behavior, scenario: VerificationScenario): Promise<VerificationCheck> {
-  const targetSelector = selectorForRef(contract, behavior.targetRef);
-  const triggerSelector = selectorForRef(contract, behavior.trigger.targetRef);
+async function verifyCssAnimation(page: Page, targetSelector: string, triggerSelector: string, behavior: Behavior, scenario: VerificationScenario): Promise<VerificationCheck> {
   await page.locator(triggerSelector).scrollIntoViewIfNeeded();
   await page.locator(triggerSelector).click();
   await page.waitForTimeout(numberParameter(scenario, 'sampleAtMs'));
@@ -127,8 +118,7 @@ async function verifyCssAnimation(page: Page, contract: ContractPackage, behavio
   };
 }
 
-async function verifyInterruption(page: Page, contract: ContractPackage, behavior: Behavior, scenario: VerificationScenario): Promise<VerificationCheck> {
-  const selector = selectorForRef(contract, behavior.targetRef);
+async function verifyInterruption(page: Page, selector: string, behavior: Behavior, scenario: VerificationScenario): Promise<VerificationCheck> {
   const duration = behavior.timeline.domain === 'time' ? behavior.timeline.duration.value : 0;
   await page.locator(selector).scrollIntoViewIfNeeded();
   await settleScroll(page);
@@ -162,8 +152,7 @@ async function verifyInterruption(page: Page, contract: ContractPackage, behavio
   };
 }
 
-async function verifyScrollReveal(page: Page, contract: ContractPackage, behavior: Behavior, scenario: VerificationScenario): Promise<VerificationCheck> {
-  const selector = selectorForRef(contract, behavior.targetRef);
+async function verifyScrollReveal(page: Page, selector: string, behavior: Behavior, scenario: VerificationScenario): Promise<VerificationCheck> {
   await page.evaluate(() => scrollTo(0, 0));
   await settleScroll(page);
   const idle = await style(page, selector);
@@ -225,8 +214,7 @@ async function refineBoundary(
   return upper;
 }
 
-async function verifyScrub(page: Page, contract: ContractPackage, behavior: Behavior, scenario: VerificationScenario): Promise<VerificationCheck> {
-  const selector = selectorForRef(contract, behavior.targetRef);
+async function verifyScrub(page: Page, selector: string, behavior: Behavior, scenario: VerificationScenario): Promise<VerificationCheck> {
   await page.evaluate(() => scrollTo(0, 0));
   await settleScroll(page);
   const idle = await style(page, selector);
@@ -289,13 +277,40 @@ async function verifyScrub(page: Page, contract: ContractPackage, behavior: Beha
 
 async function runScenario(page: Page, contract: ContractPackage, scenario: VerificationScenario): Promise<VerificationCheck> {
   const behavior = behaviorForScenario(contract, scenario);
-  switch (scenario.kind) {
-    case 'hover': return verifyHover(page, contract, behavior, scenario);
-    case 'css_animation': return verifyCssAnimation(page, contract, behavior, scenario);
-    case 'interrupted_transition': return verifyInterruption(page, contract, behavior, scenario);
-    case 'scroll_reveal': return verifyScrollReveal(page, contract, behavior, scenario);
-    case 'gsap_scrub': return verifyScrub(page, contract, behavior, scenario);
+  const refs = [...new Set([
+    behavior.targetRef,
+    ...(behavior.trigger.targetRef === 'viewport' ? [] : [behavior.trigger.targetRef]),
+  ])];
+  let resolutions: LocatorResolution[];
+  try {
+    resolutions = await Promise.all(refs.map((ref) => resolveContractElement(page, contract, ref)));
+  } catch (error) {
+    return {
+      scenarioId: scenario.scenarioId,
+      behaviorId: behavior.behaviorId,
+      status: 'failed',
+      scenario: 'Resolve contract targets independently and reject ambiguous candidates.',
+      metrics: { locatorRejected: true },
+      mismatches: [error instanceof Error ? error.message : String(error)],
+    };
   }
+  const selectors = new Map(resolutions.map((resolution) => [resolution.ref, resolution.selector]));
+  const targetSelector = selectors.get(behavior.targetRef)!;
+  let check: VerificationCheck;
+  switch (scenario.kind) {
+    case 'hover': check = await verifyHover(page, targetSelector, behavior, scenario); break;
+    case 'css_animation': check = await verifyCssAnimation(page, targetSelector, selectors.get(behavior.trigger.targetRef)!, behavior, scenario); break;
+    case 'interrupted_transition': check = await verifyInterruption(page, targetSelector, behavior, scenario); break;
+    case 'scroll_reveal': check = await verifyScrollReveal(page, targetSelector, behavior, scenario); break;
+    case 'gsap_scrub': check = await verifyScrub(page, targetSelector, behavior, scenario); break;
+  }
+  check.metrics.locatorStrategy = resolutions.every((resolution) => resolution.strategy === 'structural_fingerprint')
+    ? 'structural_fingerprint'
+    : 'captured_identity';
+  check.metrics.locatorMinimumScore = Math.min(...resolutions.map((resolution) => resolution.score));
+  check.metrics.locatorMinimumMargin = Math.min(...resolutions.map((resolution) => resolution.margin));
+  check.metrics.locatorCandidateCount = Math.max(...resolutions.map((resolution) => resolution.candidateCount));
+  return check;
 }
 
 async function validateEvidenceFiles(contract: ContractPackage, contractPath: string): Promise<void> {
@@ -338,8 +353,8 @@ export async function verifyPhase0(contractFile: string, options: VerifyOptions 
       heldOutConditions: [
         `Viewport ${suite.viewport.width}x${suite.viewport.height}`,
         'Scenario parameters loaded from versioned JSON',
-        'Elements resolved by stable data identity, not source selectors',
-        ...(target === 'replica' ? ['Independent markup and no GSAP runtime'] : []),
+        'Elements resolved by scored identity and structural evidence, not source selectors',
+        ...(target === 'replica' ? ['Independent markup, no shared capture IDs, and no GSAP runtime'] : []),
       ],
       checks,
       summary: { passed, failed: checks.length - passed, total: checks.length },

@@ -1,6 +1,6 @@
-const animationTarget = document.querySelector('[data-wbc-id="css-animation"]');
+const animationTarget = document.querySelector('.animation-equivalent');
 let activeAnimation;
-document.querySelector('[data-wbc-id="animation-trigger"]').addEventListener('click', () => {
+document.querySelector('.run').addEventListener('click', () => {
   activeAnimation?.cancel();
   activeAnimation = animationTarget.animate(
     [
@@ -12,9 +12,9 @@ document.querySelector('[data-wbc-id="animation-trigger"]').addEventListener('cl
   );
 });
 
-const reveal = document.querySelector('[data-wbc-id="scroll-reveal"]');
+const reveal = document.querySelector('.reveal-equivalent');
 const scrubRegion = document.querySelector('[data-scroll-region]');
-const scrubTarget = document.querySelector('[data-wbc-id="gsap-scrub"]');
+const scrubTarget = document.querySelector('.scrub-equivalent');
 
 function updateScrollBehaviors() {
   const revealRect = reveal.getBoundingClientRect();

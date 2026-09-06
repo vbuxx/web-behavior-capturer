@@ -20,12 +20,12 @@ Lifecycle epoch B memuat dua button dengan `data-wbc-id` serta role yang sama da
 - Dua ambiguous button memiliki ID berbeda tetapi ambiguity tetap terlihat.
 - SQLite element count harus sama dengan contract.
 
-## Limitations and Next Gate
+## Limitations and Completed Next Gate
 
-- Locator masih membutuhkan source-assisted `data-wbc-id` untuk behavior utama.
+- Registry sumber masih mencatat `data-wbc-id` sebagai salah satu kandidat audit, tetapi verifier replika tidak lagi membutuhkannya.
 - Role belum membawa accessible name karena raw text belum aman untuk persistence.
 - Bounds berada pada coordinate space dokumen target, belum diproyeksikan ke top-level viewport melalui frame chain.
 - Ordinal ambiguous element dapat berubah ketika DOM direorder.
 - Shadow DOM dan pseudo-element identity belum masuk registry.
 
-Gate berikutnya adalah resolver yang menggabungkan candidate uniqueness, ancestry, geometry, dan optional redacted accessible-name fingerprint saat mencocokkan contract ke replika. Setelah resolver tidak lagi bergantung pada shared `data-wbc-id`, Fase 1 dapat ditutup dan service layer dimulai.
+Resolver independen telah ditambahkan pada schema 1.5.0 dengan fingerprint tanpa teks mentah. Hasil dan batas confidence-nya dicatat di `PHASE-1-LOCATOR-REPORT.md`. Gate berikutnya bergeser ke service/API session lokal dan viewer minimal.

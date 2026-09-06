@@ -1,15 +1,15 @@
 {
   "schemaVersion": "1.0.0",
-  "verifiedAt": "2026-09-06T03:38:43.035Z",
-  "referenceSessionId": "5d8b25a9-dd8f-472c-b8db-13cb83c44067",
+  "verifiedAt": "2026-09-06T04:27:41.259Z",
+  "referenceSessionId": "1a7454bd-1504-4aa9-9a48-59216b80631c",
   "scenarioSuiteId": "phase0-held-out-v1",
   "targetLabel": "replica",
-  "targetUrl": "http://127.0.0.1:61253/replica/",
+  "targetUrl": "http://127.0.0.1:63408/replica/",
   "heldOutConditions": [
     "Viewport 1100x740",
     "Scenario parameters loaded from versioned JSON",
-    "Elements resolved by stable data identity, not source selectors",
-    "Independent markup and no GSAP runtime"
+    "Elements resolved by scored identity and structural evidence, not source selectors",
+    "Independent markup, no shared capture IDs, and no GSAP runtime"
   ],
   "checks": [
     {
@@ -20,7 +20,11 @@
       "metrics": {
         "expectedYDelta": -12,
         "observedYDelta": -12,
-        "opacityDelta": 0.28
+        "opacityDelta": 0.28,
+        "locatorStrategy": "structural_fingerprint",
+        "locatorMinimumScore": 0.6719,
+        "locatorMinimumMargin": 0.0221,
+        "locatorCandidateCount": 38
       },
       "mismatches": []
     },
@@ -32,7 +36,11 @@
       "metrics": {
         "activeAnimations": 1,
         "expectedDurationMs": 600,
-        "observedDurationMs": 600
+        "observedDurationMs": 600,
+        "locatorStrategy": "structural_fingerprint",
+        "locatorMinimumScore": 0.9012,
+        "locatorMinimumMargin": 0.0689,
+        "locatorCandidateCount": 38
       },
       "mismatches": []
     },
@@ -44,11 +52,15 @@
       "metrics": {
         "heldOutExitMs": 105,
         "changedBeforeExit": true,
-        "interruptionTranslationX": 29.531,
+        "interruptionTranslationX": 20.079,
         "idleTranslationX": 0,
         "recoveredTranslationX": 0,
         "idleOpacity": 0.58,
-        "recoveredOpacity": 0.58
+        "recoveredOpacity": 0.58,
+        "locatorStrategy": "structural_fingerprint",
+        "locatorMinimumScore": 0.7935,
+        "locatorMinimumMargin": 0.196,
+        "locatorCandidateCount": 38
       },
       "mismatches": []
     },
@@ -61,7 +73,11 @@
         "resolvedOnsetScrollY": 1121.5,
         "revealed": true,
         "hiddenAfterReverse": true,
-        "reverseOpacity": 0
+        "reverseOpacity": 0,
+        "locatorStrategy": "structural_fingerprint",
+        "locatorMinimumScore": 0.9712,
+        "locatorMinimumMargin": 0.237,
+        "locatorCandidateCount": 38
       },
       "mismatches": []
     },
@@ -75,7 +91,11 @@
         "reverseMonotonic": true,
         "observedStartPx": 1625.508,
         "observedEndPx": 2124.531,
-        "expectedTravelPx": 420
+        "expectedTravelPx": 420,
+        "locatorStrategy": "structural_fingerprint",
+        "locatorMinimumScore": 0.9051,
+        "locatorMinimumMargin": 0.1065,
+        "locatorCandidateCount": 38
       },
       "mismatches": []
     }

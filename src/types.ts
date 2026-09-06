@@ -60,6 +60,18 @@ export interface ElementRef {
   dataWbcId: string;
   instanceOrdinal: number;
   bounds: { x: number; y: number; width: number; height: number };
+  structuralFingerprint: {
+    tagName: string;
+    role: string | null;
+    depth: number;
+    childElementCount: number;
+    documentOrder: number;
+    documentProgress: number;
+    widthRatio: number;
+    heightPx: number;
+    hasTransition: boolean;
+    transitionDurationMs: number;
+  };
   locatorCandidates: Array<{
     strategy: 'data_attribute' | 'id' | 'role';
     value: string;
@@ -141,7 +153,7 @@ export interface Behavior {
 
 export interface CaptureManifest {
   productVersion: string;
-  schemaVersion: '1.4.0';
+  schemaVersion: '1.5.0';
   sessionId: string;
   navigationId: string;
   generatedAt: string;
@@ -187,7 +199,7 @@ export interface CaptureManifest {
 }
 
 export interface ContractPackage {
-  schemaVersion: '1.4.0';
+  schemaVersion: '1.5.0';
   manifest: CaptureManifest;
   elements: ElementRef[];
   behaviors: Behavior[];

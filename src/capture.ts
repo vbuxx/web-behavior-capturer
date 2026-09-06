@@ -613,10 +613,10 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     const sessionId = randomUUID();
     const browserVersion = browser.version();
     const contract: ContractPackage = {
-      schemaVersion: '1.4.0',
+      schemaVersion: '1.5.0',
       manifest: {
-        productVersion: '0.4.0-phase1',
-        schemaVersion: '1.4.0',
+        productVersion: '0.5.0-phase1',
+        schemaVersion: '1.5.0',
         sessionId,
         navigationId: 'nav-1',
         generatedAt: new Date().toISOString(),
@@ -644,6 +644,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           { name: 'structured_data_redaction', status: 'supported', detail: 'Sensitive keys, header-style values, bearer tokens, and credential query parameters are redacted before persistence.' },
           { name: 'visual_redaction', status: 'not_attempted', detail: 'Screenshot regions are not OCR-scanned or blurred.' },
           { name: 'target_scoped_element_registry', status: 'supported', detail: 'Element identity, bounds, locator candidates, and ambiguity are scoped to target and navigation epoch.' },
+          { name: 'independent_structural_locator', status: 'supported', detail: 'Verifier scores structural and layout fingerprints and rejects weak or ambiguous matches without requiring shared source IDs.' },
           { name: 'text_locator_candidates', status: 'unavailable', detail: 'Raw visible text is excluded until a compatible redaction policy exists.' },
         ],
         targetCoverage,
@@ -672,6 +673,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           'The SQLite API is experimental in the pinned Node.js runtime; the sidecar format may require migration before release.',
           'Redaction covers structured evidence and URL query parameters; visual evidence and arbitrary text content are not redacted.',
           'Locator candidates exclude visible text; ordinal identity for fully ambiguous elements may drift after DOM reordering.',
+          'Independent structural resolution is heuristic; major layout reordering or many visually identical candidates can be rejected as ambiguous.',
           'No MCP server or viewer is included in the current slice.',
         ],
       },
