@@ -13,6 +13,13 @@ export interface BrowserLoadBenchmark {
   baselineNavigationMs: number;
   observedNavigationMs: number;
   observerDroppedRecords: number;
+  baselinePeakPrivateMemoryBytes: number;
+  observedPeakPrivateMemoryBytes: number;
+  privateMemorySupported: boolean;
+  baselineWorkerMessages: number;
+  observedWorkerMessages: number;
+  baselineCrossOriginReady: boolean;
+  observedCrossOriginReady: boolean;
   baselinePeakJsHeapBytes: number;
   observedPeakJsHeapBytes: number;
   baselinePeakDomNodes: number;
@@ -70,10 +77,20 @@ async function runRuntimeBurst(page: import('playwright').Page, cdp: import('pla
   return { peakJsHeapBytes, peakDomNodes, ...burst };
 }
 
+async function processPrivateMemory(cdp: import('playwright').CDPSession): Promise<number> {
+  try {
+    const result = await cdp.send('SystemInfo.getProcessInfo') as { processInfo?: Array<{ privateMemory?: number }> };
+    return Math.max(0, ...(result.processInfo ?? []).map((process) => process.privateMemory ?? 0));
+  } catch {
+    return 0;
+  }
+}
+
 export async function benchmarkSyntheticBrowser(iterations = 2): Promise<BrowserLoadBenchmark> {
   if (!Number.isInteger(iterations) || iterations < 1 || iterations > 10) throw new Error('Browser benchmark iterations must be 1 to 10');
   const server = await startFixtureServer();
   const browser = await chromium.launch({ headless: true });
+  const browserCdp = await browser.newBrowserCDPSession();
   const baselineFrames: number[] = [];
   const observedFrames: number[] = [];
   const baselineNavigation: number[] = [];
@@ -86,6 +103,12 @@ export async function benchmarkSyntheticBrowser(iterations = 2): Promise<Browser
   const observedScroll: number[] = [];
   const baselinePointer: number[] = [];
   const observedPointer: number[] = [];
+  const baselinePrivateMemory: number[] = [];
+  const observedPrivateMemory: number[] = [];
+  const baselineWorkers: number[] = [];
+  const observedWorkers: number[] = [];
+  const baselineCrossOrigin: boolean[] = [];
+  const observedCrossOrigin: boolean[] = [];
   let nodeCount = 0;
   let trackCount = 0;
   let observerDroppedRecords = 0;
@@ -98,9 +121,12 @@ export async function benchmarkSyntheticBrowser(iterations = 2): Promise<Browser
       await baselinePage.goto(`${server.url}/load/`, { waitUntil: 'networkidle' });
       await baselinePage.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__?: { ready: boolean } }).__WBC_LOAD__?.ready === true);
       baselineNavigation.push(performance.now() - baselineStart);
-      const baselineInfo = await baselinePage.evaluate(() => (globalThis as unknown as { __WBC_LOAD__: { nodes: number; tracks: number } }).__WBC_LOAD__);
+      await baselinePage.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__: { crossOriginReady: boolean } }).__WBC_LOAD__.crossOriginReady === true);
+      const baselineInfo = await baselinePage.evaluate(() => (globalThis as unknown as { __WBC_LOAD__: { nodes: number; tracks: number; workerMessages: number; crossOriginReady: boolean } }).__WBC_LOAD__);
       nodeCount = baselineInfo.nodes;
       trackCount = baselineInfo.tracks;
+      baselineWorkers.push(baselineInfo.workerMessages);
+      baselineCrossOrigin.push(baselineInfo.crossOriginReady);
       baselineFrames.push(p95(await measureFrameIntervals(baselinePage)));
       const baselineCdp = await baselineContext.newCDPSession(baselinePage);
       const baselineRuntime = await runRuntimeBurst(baselinePage, baselineCdp);
@@ -108,6 +134,7 @@ export async function benchmarkSyntheticBrowser(iterations = 2): Promise<Browser
       baselineNodes.push(baselineRuntime.peakDomNodes);
       baselineScroll.push(baselineRuntime.scrollEvents);
       baselinePointer.push(baselineRuntime.pointerBursts);
+      baselinePrivateMemory.push(await processPrivateMemory(browserCdp));
       await baselineContext.close();
 
       const observedContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -115,8 +142,12 @@ export async function benchmarkSyntheticBrowser(iterations = 2): Promise<Browser
       const observedPage = await observedContext.newPage();
       const observedStart = performance.now();
       await observedPage.goto(`${server.url}/load/`, { waitUntil: 'networkidle' });
-      await observedPage.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__?: { ready: boolean } }).__WBC_LOAD__?.ready === true);
+      await observedPage.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__?: { ready: boolean; crossOriginReady: boolean } }).__WBC_LOAD__?.ready === true);
+      await observedPage.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__: { crossOriginReady: boolean } }).__WBC_LOAD__.crossOriginReady === true);
       observedNavigation.push(performance.now() - observedStart);
+      const observedInfo = await observedPage.evaluate(() => (globalThis as unknown as { __WBC_LOAD__: { workerMessages: number; crossOriginReady: boolean } }).__WBC_LOAD__);
+      observedWorkers.push(observedInfo.workerMessages);
+      observedCrossOrigin.push(observedInfo.crossOriginReady);
       observedFrames.push(p95(await measureFrameIntervals(observedPage)));
       const observedCdp = await observedContext.newCDPSession(observedPage);
       const observedRuntime = await runRuntimeBurst(observedPage, observedCdp);
@@ -124,6 +155,7 @@ export async function benchmarkSyntheticBrowser(iterations = 2): Promise<Browser
       observedNodes.push(observedRuntime.peakDomNodes);
       observedScroll.push(observedRuntime.scrollEvents);
       observedPointer.push(observedRuntime.pointerBursts);
+      observedPrivateMemory.push(await processPrivateMemory(browserCdp));
       observerDroppedRecords += (await readPageObserver(observedPage)).droppedRecords;
       await observedContext.close();
     }
@@ -147,5 +179,12 @@ export async function benchmarkSyntheticBrowser(iterations = 2): Promise<Browser
     observedScrollEvents: Math.round(median(observedScroll)),
     baselinePointerBursts: Math.round(median(baselinePointer)),
     observedPointerBursts: Math.round(median(observedPointer)),
+    baselinePeakPrivateMemoryBytes: Math.round(Math.max(...baselinePrivateMemory)),
+    observedPeakPrivateMemoryBytes: Math.round(Math.max(...observedPrivateMemory)),
+    privateMemorySupported: baselinePrivateMemory.some((value) => value > 0) || observedPrivateMemory.some((value) => value > 0),
+    baselineWorkerMessages: Math.round(median(baselineWorkers)),
+    observedWorkerMessages: Math.round(median(observedWorkers)),
+    baselineCrossOriginReady: baselineCrossOrigin.every(Boolean),
+    observedCrossOriginReady: observedCrossOrigin.every(Boolean),
   };
 }

@@ -13,4 +13,4 @@ Tambahkan fixture `/load/` dengan 5.000 nodes dan 50 CSS animations, lalu jalank
 
 ## Consequence
 
-Current machine menunjukkan 0% frame degradation dan zero observer loss pada dua iterasi. Observer peak JS heap 2,427 MB versus baseline 1,513 MB pada route ini. Hasil ini bukan SLA: peak RSS, visual/asset capture, worker traffic, atau finalization end-to-end belum tercakup.
+Current machine menunjukkan 0% frame degradation dan zero observer loss pada dua iterasi. Worker dan cross-origin frame readiness terbukti; observer peak JS heap 2,915 MB versus baseline 1,898 MB pada route ini. Hasil ini bukan SLA: peak RSS native (CDP unsupported), visual/asset capture, CDP event volume, atau finalization end-to-end belum tercakup.

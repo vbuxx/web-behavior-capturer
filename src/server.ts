@@ -67,6 +67,11 @@ export async function startFixtureServer(): Promise<FixtureServer> {
       response.end(JSON.stringify({ crossOriginFrameUrl: `${crossOriginUrl}/cross-origin-frame/${redactionProbe}` }));
       return;
     }
+    if (url.pathname === '/load-config.json') {
+      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      response.end(JSON.stringify({ crossOriginFrameUrl: `${crossOriginUrl}/cross-origin-frame/` }));
+      return;
+    }
     const file = routes[url.pathname];
     if (!file) {
       response.writeHead(404).end('Not found');
