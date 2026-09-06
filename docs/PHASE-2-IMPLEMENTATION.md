@@ -18,7 +18,8 @@ Dokumen ini mencatat bukti engineering yang sudah ada; status fixture tidak dina
 - Held-out verifier task-specific masih tersedia untuk hover, CSS/WAAPI, dan GSAP reverse. Nested scroller, boolean/numeric GSAP full matrix, overlap composition, navigation/cancellation semantic contract, open-shadow semantic compilation, worker lifecycle, dan network-delayed state belum boleh disebut `supported` hanya karena evidence runtime tersedia.
 - Worker-of-worker, closed shadow DOM, Windows, non-Chromium, OCR, Lottie, Canvas/WebGL semantic reconstruction, dan website nyata tetap Fase 3.
 - Probe plan saat ini sudah divalidasi dan direkam, tetapi diagnostic runner masih menjalankan canonical fixture run; variasi yang belum dieksekusi tetap limitation, bukan evidence eksperimen.
-- Matriks penuh 108 run belum dijalankan. Smoke 9 run dan preflight verifier menjadi gate berikutnya.
+- Smoke harness 9 run sudah lulus pada 7 September 2026 dengan adapter proses sintetis: 3 P0 task × 3 condition, seluruh bundle berada di bawah 65.536 byte dan seluruh held-out verifier yang tersedia lulus. Ini membuktikan harness/isolation, bukan agent success model.
+- Matriks penuh 108 run belum dijalankan; tujuh task partial tetap unsupported pada denominator utama sampai verifier-nya tersedia.
 
 ## Gate berikutnya
 
