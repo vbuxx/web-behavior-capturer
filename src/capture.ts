@@ -932,6 +932,10 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`, 'utf8');
     injectCaptureFailure('before-index');
     await buildSessionIndex(stagingDirectory, contractPath, contract, recorder.records, evidenceGraphPath);
+    // Validate the complete staged package before promotion. This closes the
+    // quota/crash window where a partially written index could otherwise be
+    // atomically renamed as if it were a valid session.
+    await inspectSessionPackage(stagingDirectory);
     finalizationMs = Number((performance.now() - finalizationStarted).toFixed(3));
     await context.close();
     await phase('before-promotion');
