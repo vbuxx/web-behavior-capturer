@@ -159,6 +159,7 @@ export interface CaptureManifest {
   sessionId: string;
   navigationId: string;
   generatedAt: string;
+  evidenceGraph?: { revision: string; path: string; sha256: string };
   status?: CaptureSessionState;
   resumedFromSessionId?: string;
   source: {
@@ -257,5 +258,6 @@ export interface SessionIndexManifest {
   generatedAt: string;
   database: { path: string; sha256: string };
   contract: { path: string; sha256: string };
+  evidenceGraph?: { path: string; sha256: string };
   counts: { targets: number; elements: number; behaviors: number; evidence: number; records: number };
 }

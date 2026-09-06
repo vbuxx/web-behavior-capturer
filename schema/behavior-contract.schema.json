@@ -110,6 +110,16 @@
         "sessionId": { "type": "string" },
         "navigationId": { "type": "string" },
         "generatedAt": { "type": "string", "format": "date-time" },
+        "evidenceGraph": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["revision", "path", "sha256"],
+          "properties": {
+            "revision": { "type": "string", "minLength": 1 },
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
         "status": { "enum": ["running", "stopping", "finalizing", "completed", "cancelled", "failed"] },
         "resumedFromSessionId": { "type": "string", "minLength": 1 },
         "source": { "type": "object" },

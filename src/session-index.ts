@@ -4,6 +4,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { BehaviorKind, ContractPackage, EvidenceRecord, SessionIndexManifest } from './types.js';
 import { validateContract, validateSessionIndexManifest } from './validate.js';
+import { validateEvidenceGraph } from './evidence-graph-validate.js';
 
 export interface SessionInspection {
   sessionId: string;
@@ -73,6 +74,7 @@ export async function buildSessionIndex(
   contractPath: string,
   contract: ContractPackage,
   records: EvidenceRecord[],
+  evidenceGraphPath?: string,
 ): Promise<{ databasePath: string; manifestPath: string; manifest: SessionIndexManifest }> {
   const databasePath = resolve(packageDirectory, 'session.sqlite');
   const manifestPath = resolve(packageDirectory, 'session-index.json');
@@ -212,6 +214,7 @@ export async function buildSessionIndex(
     generatedAt: new Date().toISOString(),
     database: { path: relative(packageDirectory, databasePath), sha256: await sha256(databasePath) },
     contract: { path: relative(packageDirectory, contractPath), sha256: await sha256(contractPath) },
+    ...(evidenceGraphPath ? { evidenceGraph: { path: relative(packageDirectory, evidenceGraphPath), sha256: await sha256(evidenceGraphPath) } } : {}),
     counts: {
       targets: contract.manifest.targetCoverage.length,
       elements: contract.elements.length,
@@ -232,8 +235,22 @@ export async function inspectSessionPackage(packageDirectory: string): Promise<S
   const contractPath = resolveInside(packageRoot, manifest.contract.path);
   if (await sha256(databasePath) !== manifest.database.sha256) throw new Error('Session index checksum mismatch');
   if (await sha256(contractPath) !== manifest.contract.sha256) throw new Error('Behavior Contract checksum mismatch');
-
   const contract = await validateContract(JSON.parse(await readFile(contractPath, 'utf8')));
+  if (manifest.evidenceGraph) {
+    const graphPath = resolveInside(packageRoot, manifest.evidenceGraph.path);
+    if (await sha256(graphPath) !== manifest.evidenceGraph.sha256) throw new Error('Evidence graph checksum mismatch');
+    const graph = await validateEvidenceGraph(JSON.parse(await readFile(graphPath, 'utf8')));
+    if (graph.sessionId !== contract.manifest.sessionId || graph.revision !== contract.manifest.evidenceGraph?.revision) {
+      throw new Error('Evidence graph identity does not match Behavior Contract');
+    }
+    const evidenceIds = new Set(contract.evidenceIndex.map((entry) => entry.id));
+    for (const node of graph.nodes) {
+      if (node.evidenceRefs.some((ref) => !evidenceIds.has(ref))) throw new Error(`Evidence graph node references missing evidence: ${node.id}`);
+    }
+    for (const edge of graph.edges) {
+      if (edge.evidenceRefs.some((ref) => !evidenceIds.has(ref))) throw new Error(`Evidence graph edge references missing evidence: ${edge.id}`);
+    }
+  }
   const checkedPaths = new Map<string, string>();
   for (const evidence of contract.evidenceIndex) {
     const existingHash = checkedPaths.get(evidence.path);

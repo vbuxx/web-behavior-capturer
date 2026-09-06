@@ -8,6 +8,8 @@ import { buildSessionIndex } from './session-index.js';
 import { TargetRegistry } from './target-registry.js';
 import { Redactor } from './redaction.js';
 import { validateContract } from './validate.js';
+import { compileEvidenceGraph } from './evidence-graph.js';
+import { validateEvidenceGraph } from './evidence-graph-validate.js';
 import { loadVisualRedactionPolicy, screenshotWithVisualMask, type VisualRedactionPolicy } from './visual-redaction.js';
 import type {
   Behavior,
@@ -756,7 +758,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           'GSAP semantic extraction requires an accessible public adapter; private instances use sampled fallback.',
           'Observer overhead benchmark includes page-world frame observers but not the host registry or worker collector installation.',
           'The SQLite API is experimental in the pinned Node.js runtime; the sidecar format may require migration before release.',
-          'Redaction covers structured evidence and URL query parameters; visual evidence and arbitrary text content are not redacted.',
+          'Redaction covers structured evidence and URL query parameters; visual masking follows the selector policy, while arbitrary text still has no OCR coverage.',
           'Network evidence intentionally excludes headers and bodies; request/response payload semantics are unknown.',
           'Locator candidates exclude visible text; ordinal identity for fully ambiguous elements may drift after DOM reordering.',
           'Independent structural resolution is heuristic; major layout reordering or many visually identical candidates can be rejected as ambiguous.',
@@ -770,12 +772,21 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
       evidenceIndex,
     };
 
+    const graph = compileEvidenceGraph(contract, recorder.records);
+    await validateEvidenceGraph(graph);
+    const evidenceGraphPath = join(stagingDirectory, 'evidence-graph.json');
+    await writeFile(evidenceGraphPath, `${JSON.stringify(graph, null, 2)}\n`, 'utf8');
+    contract.manifest.evidenceGraph = {
+      revision: graph.revision,
+      path: relative(stagingDirectory, evidenceGraphPath),
+      sha256: await hashFile(evidenceGraphPath),
+    };
     await validateContract(contract);
     const contractPath = join(stagingDirectory, 'behavior-contract.json');
     injectCaptureFailure('before-contract');
     await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`, 'utf8');
     injectCaptureFailure('before-index');
-    await buildSessionIndex(stagingDirectory, contractPath, contract, recorder.records);
+    await buildSessionIndex(stagingDirectory, contractPath, contract, recorder.records, evidenceGraphPath);
     await context.close();
     await rename(stagingDirectory, absoluteOutput);
     promoted = true;

@@ -75,6 +75,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `src/scenarios.ts` memvalidasi dan membaca suite skenario JSON berversi.
 - `src/browser-observer.ts` memasang page-world observer sebelum script fixture.
 - `schema/behavior-contract.schema.json` mendefinisikan kontrak JSON 1.6.0 yang tetap menerima package 1.5.0 secara additive.
+- `schema/evidence-graph.schema.json` mendefinisikan graph provenance 1.0.0; `src/evidence-graph.ts` menyusun node/edge dan `src/evidence-graph-validate.ts` memvalidasi checksum-safe reopen.
 - `schema/session-index.schema.json` mendefinisikan manifest checksum untuk reopenable index.
 - `fixtures/phase0` berisi ground-truth lokal dan GSAP yang disajikan dari dependency lokal.
 - `fixtures/replica` berisi implementasi independen tanpa GSAP, selector sumber, atau shared `data-wbc-id`.
@@ -132,6 +133,8 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0018-writer-failure-recovery.md` menetapkan fail-closed behavior untuk error normal saat finalisasi.
 - `docs/decisions/0027-schema-1-6-lifecycle-state.md` menetapkan additive schema 1.6 dan state cancellation fail-closed.
 - `docs/decisions/0028-visual-and-network-privacy.md` menetapkan selector masking dan larangan network header/body capture.
+- `docs/decisions/0029-evidence-graph-and-revision.md` menetapkan graph revision, provenance edge, dan explicit unknown boundary.
+- `docs/PHASE-2-EVIDENCE-GRAPH-REPORT.md` berisi hasil graph foundation dan scope boundary.
 - `src/staging.ts` menyediakan janitor age-bounded untuk orphan staging directory setelah hard crash.
 
 ## Batas interpretasi

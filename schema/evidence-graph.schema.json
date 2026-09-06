@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wbc.local/schema/evidence-graph-1.0.0.json",
+  "title": "Website Behavior Capture Evidence Graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "revision", "sessionId", "generatedAt", "nodes", "edges", "limitations"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "revision": { "type": "string", "minLength": 1 },
+    "sessionId": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "nodes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "limitations": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "evidenceRefs", "targetRef", "navigationId", "clockUncertaintyMs", "payload"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["input", "observable_state", "mutation", "animation", "network_completion", "visual_checkpoint", "probe_run"] },
+        "evidenceRefs": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "targetRef": { "type": ["string", "null"] },
+        "navigationId": { "type": ["string", "null"] },
+        "clockUncertaintyMs": { "type": ["number", "null"], "minimum": 0 },
+        "payload": { "type": "object" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "class", "evidenceRefs", "targetRef", "navigationId", "clockUncertaintyMs", "limitation"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "class": { "enum": ["direct", "experiment_supported", "correlated", "unknown"] },
+        "evidenceRefs": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "targetRef": { "type": ["string", "null"] },
+        "navigationId": { "type": ["string", "null"] },
+        "clockUncertaintyMs": { "type": ["number", "null"], "minimum": 0 },
+        "limitation": { "type": "string" }
+      }
+    }
+  }
+}

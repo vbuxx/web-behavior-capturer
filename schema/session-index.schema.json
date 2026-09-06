@@ -10,6 +10,7 @@
     "generatedAt": { "type": "string", "format": "date-time" },
     "database": { "$ref": "#/$defs/file" },
     "contract": { "$ref": "#/$defs/file" },
+    "evidenceGraph": { "$ref": "#/$defs/file" },
     "counts": {
       "type": "object",
       "additionalProperties": false,

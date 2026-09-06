@@ -10,6 +10,7 @@ import { runTechnicalProbes } from '../src/probes.js';
 import { inspectSessionPackage, querySessionBehaviors, querySessionRecords } from '../src/session-index.js';
 import { validateContract } from '../src/validate.js';
 import { verifyPhase0 } from '../src/verify.js';
+import { validateEvidenceGraph } from '../src/evidence-graph-validate.js';
 
 test('captures and verifies all Phase 0 behaviors with traceable evidence', { timeout: 90_000 }, async () => {
   const temporaryDirectory = await mkdtemp(join(tmpdir(), 'wbc-phase0-'));
@@ -24,6 +25,14 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
     assert.equal(contract.manifest.quality.streaming?.mode, 'host_batch');
     assert.equal(contract.manifest.quality.streaming?.flushIntervalMs, 50);
     assert.equal(contract.manifest.quality.streaming?.batchSize, 128);
+    assert.ok(contract.manifest.evidenceGraph);
+    const graphPath = join(dirname(capture.contractPath), contract.manifest.evidenceGraph!.path);
+    const graph = await validateEvidenceGraph(JSON.parse(await readFile(graphPath, 'utf8')));
+    assert.equal(graph.revision, contract.manifest.evidenceGraph!.revision);
+    assert.deepEqual(
+      new Set(graph.nodes.map((node) => node.kind)),
+      new Set(['input', 'observable_state', 'mutation', 'animation', 'network_completion', 'visual_checkpoint', 'probe_run']),
+    );
     assert.equal(contract.manifest.redaction.policyVersion, '1.0.0');
     assert.ok(contract.manifest.redaction.redactedValues > 0);
     assert.ok(contract.manifest.redaction.categories.includes('token'));
