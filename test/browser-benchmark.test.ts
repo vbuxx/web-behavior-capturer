@@ -8,6 +8,9 @@ test('benchmarks a synthetic browser route with 5k nodes and 50 tracks', { timeo
   assert.equal(result.trackCount, 50);
   assert.equal(result.observerDroppedRecords, 0);
   assert.ok(Number.isFinite(result.degradationPercent));
+  assert.ok(result.observedPeakJsHeapBytes >= result.baselinePeakJsHeapBytes);
+  assert.ok(result.observedPeakDomNodes >= result.baselinePeakDomNodes);
+  assert.ok(result.observedPointerBursts > 0);
   assert.ok(result.baselineNavigationMs > 0);
   assert.ok(result.observedNavigationMs > 0);
 });
