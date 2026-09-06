@@ -32,6 +32,10 @@
         <div class="section-heading"><div><h2 id="evidence-title">Evidence sample</h2><p>First 20 bounded records from the verified index.</p></div><button id="reload" type="button">Reload</button></div>
         <div class="table-wrap"><table><thead><tr><th>Source</th><th>Type</th><th>Target</th><th>Time</th></tr></thead><tbody id="evidence"></tbody></table></div>
       </section>
+      <section aria-labelledby="timeline-title">
+        <div class="section-heading"><div><h2 id="timeline-title">Timeline</h2><p>Bounded event timeline from the selected revision.</p></div><button id="reload-timeline" type="button">Reload timeline</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Time</th><th>Type</th><th>Source</th><th>Target</th></tr></thead><tbody id="timeline"></tbody></table></div>
+      </section>
       <section aria-labelledby="visual-title">
         <h2 id="visual-title">Visual evidence</h2>
         <div class="gallery" id="visuals"></div>
@@ -41,6 +45,11 @@
         <p id="graph-summary">Loading graph revision…</p>
         <div class="table-wrap"><table><thead><tr><th>Node kind</th><th>Count</th></tr></thead><tbody id="graph-nodes"></tbody></table></div>
         <div class="table-wrap"><table><thead><tr><th>From</th><th>Class</th><th>To</th><th>Limitation</th></tr></thead><tbody id="graph-edges"></tbody></table></div>
+      </section>
+      <section aria-labelledby="verification-title">
+        <div class="section-heading"><div><h2 id="verification-title">Reference vs replica</h2><p id="verification-summary">Loading verification reports…</p></div><button id="run-probe" type="button">Request probe</button></div>
+        <pre class="detail" id="verification-detail"></pre>
+        <pre class="detail" id="probe-status"></pre>
       </section>
       <section aria-labelledby="annotation-title">
         <h2 id="annotation-title">Immutable annotation</h2>

@@ -238,12 +238,18 @@ async function main(): Promise<void> {
     const condition = option('--condition');
     const timeoutMs = option('--timeout-ms');
     const evidenceByteBudget = option('--evidence-byte-budget');
+    const model = option('--model');
+    const reasoning = option('--reasoning');
+    const seed = option('--seed');
     console.log(JSON.stringify(await evaluatePhase2(packageDirectory, report, Number(option('--repetitions') ?? 3), {
       ...(agentCommand ? { agentCommand } : {}),
       ...(taskId ? { taskId } : {}),
       ...(condition ? { condition: condition as 'screenshot' | 'trace' | 'wbc' } : {}),
       ...(timeoutMs ? { timeoutMs: Number(timeoutMs) } : {}),
       ...(evidenceByteBudget ? { evidenceByteBudget: Number(evidenceByteBudget) } : {}),
+      ...(model ? { model } : {}),
+      ...(reasoning ? { reasoning } : {}),
+      ...(seed ? { seed: Number(seed) } : {}),
     }), null, 2));
     return;
   }

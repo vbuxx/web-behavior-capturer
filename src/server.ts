@@ -43,7 +43,19 @@ export interface FixtureServer {
   close(): Promise<void>;
 }
 
-export async function startFixtureServer(): Promise<FixtureServer> {
+export interface FixtureServerOptions {
+  replicaRoot?: string;
+}
+
+export async function startFixtureServer(options: FixtureServerOptions = {}): Promise<FixtureServer> {
+  const routeMap: Record<string, string> = {
+    ...routes,
+    ...(options.replicaRoot ? {
+      '/replica/': resolve(options.replicaRoot, 'index.html'),
+      '/replica.css': resolve(options.replicaRoot, 'replica.css'),
+      '/replica.js': resolve(options.replicaRoot, 'replica.js'),
+    } : {}),
+  };
   const crossOriginServer: Server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
     if (url.pathname !== '/cross-origin-frame/') {
@@ -74,7 +86,7 @@ export async function startFixtureServer(): Promise<FixtureServer> {
       response.end(JSON.stringify({ crossOriginFrameUrl: `${crossOriginUrl}/cross-origin-frame/` }));
       return;
     }
-    const file = routes[url.pathname];
+    const file = routeMap[url.pathname];
     if (!file) {
       response.writeHead(404).end('Not found');
       return;

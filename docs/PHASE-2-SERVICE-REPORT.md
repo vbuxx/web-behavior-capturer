@@ -15,4 +15,4 @@ Each read validates the package before returning a checksum snapshot. CLI aliase
 
 ## Limitations
 
-The local job store is a single-host JSON store and does not survive a machine-wide concurrent writer race. Viewer routes still use the existing loopback server directly; service-backed viewer routing is the next integration step. MCP is local stdio only by design.
+The job store is now transactional SQLite and capture jobs run in a local worker process with heartbeat and cross-process cancellation requests. The viewer remains loopback-only and calls the same service core for probe jobs; MCP is local stdio only by design. Probe recipe variations and full multi-process crash reconciliation remain release-gate work.

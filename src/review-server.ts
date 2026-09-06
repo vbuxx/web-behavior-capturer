@@ -10,6 +10,7 @@ import { validateEvidenceGraph } from './evidence-graph-validate.js';
 import type { EvidenceGraph } from './evidence-graph.js';
 import { readRevisionIndex, validateRevision } from './revisions.js';
 import { createAnnotationRevision } from './annotation-revision.js';
+import { SessionService } from './session-service.js';
 
 const behaviorKinds: BehaviorKind[] = ['hover', 'css_animation', 'interrupted_transition', 'scroll_reveal', 'gsap_scrub'];
 const assets = new Map([
@@ -87,6 +88,7 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
   const packageRoot = resolve(packageDirectory);
   await inspectSessionPackage(packageRoot);
   const authToken = randomBytes(32).toString('base64url');
+  const service = new SessionService({ workspaceRoot: packageRoot, jobStorePath: resolve(packageRoot, '.wbc/review-jobs.sqlite') });
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new Error('Review port must be an integer from 0 to 65535');
 
   const server = createServer((request, response) => {
@@ -97,7 +99,7 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
         writeJson(response, 401, { error: 'session_auth_required' });
         return;
       }
-      if (request.method !== 'GET' && url.pathname !== '/api/annotations') {
+      if (request.method !== 'GET' && url.pathname !== '/api/annotations' && url.pathname !== '/api/probe') {
         writeJson(response, 405, { error: 'method_not_allowed' });
         return;
       }
@@ -160,6 +162,30 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
           if (value !== undefined) query[field] = value;
         }
         writeJson(response, 200, await querySessionRecords(packageRoot, query));
+        return;
+      }
+      if (url.pathname === '/api/timeline') {
+        const query: SessionRecordQuery = { limit: Math.min(optionalNumber(url, 'limit') ?? 100, 100), byteBudget: Math.min(optionalNumber(url, 'byteBudget') ?? 65_536, 65_536) };
+        const revisionId = url.searchParams.get('revisionId');
+        if (revisionId) { await loadSelectedContract(packageRoot, revisionId); query.revisionId = revisionId; }
+        const page = await querySessionRecords(packageRoot, query);
+        writeJson(response, 200, { points: page.records.map((record) => ({ time: record.sourceTime, type: record.type, targetRef: record.targetRef, source: record.source })), revision: page.revision, nextCursor: page.nextCursor });
+        return;
+      }
+      if (url.pathname === '/api/verification') {
+        const readReport = async (name: string): Promise<unknown | null> => {
+          try { return JSON.parse(await readFile(resolve(packageRoot, name), 'utf8')); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
+        };
+        writeJson(response, 200, { reference: await readReport('verification-reference.json'), replica: await readReport('verification-replica.json') });
+        return;
+      }
+      if (url.pathname === '/api/probe' && request.method === 'POST') {
+        const job = await service.runProbe('.');
+        writeJson(response, 202, job);
+        return;
+      }
+      if (url.pathname.startsWith('/api/probe/')) {
+        writeJson(response, 200, await service.status(decodeURIComponent(url.pathname.slice('/api/probe/'.length))));
         return;
       }
       if (url.pathname === '/api/visuals') {

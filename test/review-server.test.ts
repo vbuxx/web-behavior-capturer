@@ -32,6 +32,13 @@ test('serves a verified session through a read-only loopback review UI', { timeo
     assert.equal(evidence.records.length, 2);
     assert.ok(evidence.returnedBytes <= 32_768);
 
+    const timelineResponse = await fetch(`${server.url}/api/timeline?limit=5&byteBudget=32768`, { headers });
+    assert.equal(timelineResponse.status, 200);
+    assert.ok((await timelineResponse.json() as { points: unknown[] }).points.length <= 5);
+    const verificationResponse = await fetch(`${server.url}/api/verification`, { headers });
+    assert.equal(verificationResponse.status, 200);
+    assert.ok(Object.hasOwn(await verificationResponse.json() as object, 'reference'));
+
     const visualsResponse = await fetch(`${server.url}/api/visuals`, { headers });
     const visuals = await visualsResponse.json() as { count: number; visuals: Array<{ id: string; mediaType: string }> };
     assert.ok(visuals.count > 0);

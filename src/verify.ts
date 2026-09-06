@@ -19,6 +19,8 @@ export interface VerifyOptions {
   outputFile?: string;
   target?: VerificationTarget;
   scenarioFile?: string;
+  targetRoot?: string;
+  scenarioIds?: string[];
 }
 interface ObservedStyle {
   opacity: number;
@@ -328,14 +330,15 @@ export async function verifyPhase0(contractFile: string, options: VerifyOptions 
   await validateEvidenceFiles(contract, contractPath);
   const suite = await loadScenarioSuite(options.scenarioFile);
   const target = options.target ?? 'reference';
-  const server = await startFixtureServer();
+  const server = await startFixtureServer(options.targetRoot ? { replicaRoot: resolve(options.targetRoot) } : {});
   const browser = await chromium.launch({ headless: true });
   const targetUrl = `${server.url}/${target}/`;
   try {
     const context = await browser.newContext({ viewport: suite.viewport, reducedMotion: 'no-preference' });
     await context.addInitScript('globalThis.__name = globalThis.__name || ((target) => target);');
     const checks: VerificationCheck[] = [];
-    for (const scenario of suite.scenarios) {
+    const scenarios = options.scenarioIds ? suite.scenarios.filter((scenario) => options.scenarioIds?.includes(scenario.scenarioId)) : suite.scenarios;
+    for (const scenario of scenarios) {
       const page = await context.newPage();
       await page.goto(targetUrl, { waitUntil: 'networkidle' });
       await page.waitForSelector('body[data-wbc-ready="true"]');

@@ -3,6 +3,7 @@ const metrics = document.querySelector('#metrics');
 const behaviors = document.querySelector('#behaviors');
 const targets = document.querySelector('#targets');
 const evidence = document.querySelector('#evidence');
+const timeline = document.querySelector('#timeline');
 const visuals = document.querySelector('#visuals');
 const graphSummary = document.querySelector('#graph-summary');
 const graphNodes = document.querySelector('#graph-nodes');
@@ -11,6 +12,9 @@ const annotations = document.querySelector('#annotations');
 const error = document.querySelector('#error');
 const revisionSelect = document.querySelector('#revision-select');
 const behaviorDetail = document.querySelector('#behavior-detail');
+const verificationSummary = document.querySelector('#verification-summary');
+const verificationDetail = document.querySelector('#verification-detail');
+const probeStatus = document.querySelector('#probe-status');
 let selectedRevision = '';
 
 function appendTextCell(row, value) {
@@ -53,6 +57,29 @@ async function loadVisuals() {
     figure.append(image, caption);
     visuals.append(figure);
   }
+}
+
+async function loadTimeline() {
+  const page = await json(`/api/timeline?limit=100&byteBudget=65536${selectedRevision ? `&revisionId=${encodeURIComponent(selectedRevision)}` : ''}`);
+  timeline.replaceChildren();
+  for (const point of page.points) {
+    const row = document.createElement('tr');
+    appendTextCell(row, Number(point.time).toFixed(1));
+    appendTextCell(row, point.type);
+    appendTextCell(row, point.source);
+    appendTextCell(row, point.targetRef);
+    timeline.append(row);
+  }
+}
+
+async function loadVerification() {
+  const reports = await json('/api/verification');
+  const reference = reports.reference?.summary;
+  const replica = reports.replica?.summary;
+  verificationSummary.textContent = reference && replica
+    ? `Reference ${reference.passed}/${reference.total} · Replica ${replica.passed}/${replica.total}`
+    : 'Verification reports are not available for this package.';
+  verificationDetail.textContent = JSON.stringify({ reference: reports.reference, replica: reports.replica }, null, 2);
 }
 
 async function loadGraph() {
@@ -131,7 +158,7 @@ async function load() {
       appendTextCell(row, target.completeness);
       targets.append(row);
     }
-    await Promise.all([loadEvidence(), loadVisuals(), loadGraph(), loadAnnotations()]);
+    await Promise.all([loadEvidence(), loadTimeline(), loadVisuals(), loadGraph(), loadAnnotations(), loadVerification()]);
   } catch (cause) {
     error.textContent = cause instanceof Error ? cause.message : String(cause);
   }
@@ -149,6 +176,7 @@ async function loadRevisions() {
 }
 
 document.querySelector('#reload').addEventListener('click', () => void loadEvidence().catch((cause) => { error.textContent = cause.message; }));
+document.querySelector('#reload-timeline').addEventListener('click', () => void loadTimeline().catch((cause) => { error.textContent = cause.message; }));
 revisionSelect.addEventListener('change', () => { selectedRevision = revisionSelect.value; behaviors.replaceChildren(); metrics.replaceChildren(); targets.replaceChildren(); void load(); });
 document.querySelector('#annotation-form').addEventListener('submit', (event) => {
   event.preventDefault();
@@ -156,6 +184,12 @@ document.querySelector('#annotation-form').addEventListener('submit', (event) =>
   fetch('/api/annotations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note }) })
     .then((response) => response.ok ? response.json() : response.json().then((payload) => Promise.reject(new Error(payload.error))))
     .then(() => { document.querySelector('#annotation-note').value = ''; return loadAnnotations(); })
+    .catch((cause) => { error.textContent = cause.message; });
+});
+document.querySelector('#run-probe').addEventListener('click', () => {
+  fetch('/api/probe', { method: 'POST' })
+    .then((response) => response.ok ? response.json() : response.json().then((payload) => Promise.reject(new Error(payload.error))))
+    .then((job) => { probeStatus.textContent = JSON.stringify(job, null, 2); })
     .catch((cause) => { error.textContent = cause.message; });
 });
 void loadRevisions().then(() => { selectedRevision = revisionSelect.value; return load(); }).catch((cause) => { error.textContent = cause.message; });
