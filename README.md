@@ -41,6 +41,7 @@ pnpm run cleanup:staging -- --out .wbc/phase1 --max-age-ms 86400000
 pnpm run benchmark:failure
 pnpm run benchmark:corruption -- --package artifacts/phase1/latest
 pnpm run rotate:package -- --package .wbc/phase1 --archive-dir .wbc/archive
+pnpm run rotate:package -- --package .wbc/phase1 --archive-dir /Volumes/archive/wbc --copy-fallback
 pnpm run benchmark:quota -- --quota-blocks 128
 pnpm run prune:archives -- --archive-dir .wbc/archive --keep 5
 pnpm run verify -- --contract .wbc/phase1/behavior-contract.json --target reference
@@ -117,6 +118,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0022-clock-sampling-resilience.md` menetapkan multi-sample clock mapping tanpa melonggarkan threshold.
 - `docs/PHASE-1-RETENTION-REPORT.md` berisi verified-only archive retention dan quarantine behavior.
 - `docs/decisions/0023-archive-retention.md` menetapkan pruning eksplisit untuk archive package.
+- `docs/decisions/0024-cross-filesystem-rotation.md` menetapkan copy + verify + remove fallback untuk archive lintas filesystem.
 - `docs/decisions/0018-writer-failure-recovery.md` menetapkan fail-closed behavior untuk error normal saat finalisasi.
 - `src/staging.ts` menyediakan janitor age-bounded untuk orphan staging directory setelah hard crash.
 
