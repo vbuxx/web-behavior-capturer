@@ -158,7 +158,12 @@ async function buildConditionWorkspace(packageRoot: string, contract: ContractPa
   await mkdir(evidenceRoot, { recursive: true });
   const behaviorId = task.behaviorId;
   if (condition === 'screenshot') {
-    const visualEntries = contract.evidenceIndex.filter((entry) => entry.mediaType === 'image/png');
+    await mkdir(join(evidenceRoot, 'visual'), { recursive: true });
+    const visualIds = behaviorId
+      ? new Set(contract.behaviors.find((behavior) => behavior.behaviorId === behaviorId)?.visualEvidenceRefs ?? [])
+      : new Set<string>();
+    const allVisualEntries = contract.evidenceIndex.filter((entry) => entry.mediaType === 'image/png');
+    const visualEntries = (visualIds.size > 0 ? allVisualEntries.filter((entry) => visualIds.has(entry.id)) : allVisualEntries.slice(0, 3));
     for (const entry of visualEntries) await cp(resolve(packageRoot, entry.path), join(evidenceRoot, 'visual', entry.path.split('/').pop()!));
   } else if (condition === 'trace') {
     const eventsEntry = contract.evidenceIndex.find((entry) => entry.mediaType === 'application/x-ndjson');
