@@ -45,6 +45,8 @@ pnpm run rotate:package -- --package .wbc/phase1 --archive-dir /Volumes/archive/
 pnpm run benchmark:quota -- --quota-blocks 128
 pnpm run prune:archives -- --archive-dir .wbc/archive --keep 5
 pnpm run cleanup:rotation -- --archive-dir .wbc/archive --max-age-ms 86400000
+pnpm run recover:rotation -- --archive-dir .wbc/archive
+pnpm run recover:rotation -- --archive-dir .wbc/archive --apply
 pnpm run verify -- --contract .wbc/phase1/behavior-contract.json --target reference
 pnpm run verify:replica -- --contract .wbc/phase1/behavior-contract.json
 pnpm run probe -- --out .wbc/phase1/technical-probe-report.json
@@ -122,6 +124,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0024-cross-filesystem-rotation.md` menetapkan copy + verify + remove fallback untuk archive lintas filesystem.
 - `docs/PHASE-1-ROTATION-STAGING-REPORT.md` berisi janitor age-bounded untuk orphan rotation staging.
 - `docs/decisions/0025-rotation-staging-recovery.md` menetapkan cleanup terpisah dari archive retention.
+- `src/rotation-recovery.ts` menyimpan marker rotation berversi dan recovery dry-run/apply; source hanya dihapus setelah archive identity dan checksum terverifikasi.
 - `docs/decisions/0018-writer-failure-recovery.md` menetapkan fail-closed behavior untuk error normal saat finalisasi.
 - `src/staging.ts` menyediakan janitor age-bounded untuk orphan staging directory setelah hard crash.
 

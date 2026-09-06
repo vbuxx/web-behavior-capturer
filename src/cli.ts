@@ -208,7 +208,15 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error('Usage: tsx src/cli.ts <capture|verify|probe|inspect|query|evidence|review|benchmark|browser-benchmark|capture-benchmark|reliability-benchmark|crash-benchmark|cleanup-staging|failure-benchmark|corruption-benchmark|rotate-package|quota-benchmark|prune-archives|cleanup-rotation> [--out PATH] [--package PATH] [--archive-dir PATH] [--keep N] [--quota-blocks N] [--copy-fallback] [--port N] [--parallel N] [--cycles N] [--kill-after-ms N] [--max-age-ms N] [--iterations N] [--synthetic] [--records N] [--evidence-mb N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
+  if (command === 'rotation-recover') {
+    const { recoverRotationMarkers } = await import('./rotation-recovery.js');
+    const archiveDirectory = resolve(option('--archive-dir') ?? '.wbc/archive');
+    const result = await recoverRotationMarkers(archiveDirectory, { apply: process.argv.includes('--apply') });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.error('Usage: tsx src/cli.ts <capture|verify|probe|inspect|query|evidence|review|benchmark|browser-benchmark|capture-benchmark|reliability-benchmark|crash-benchmark|cleanup-staging|failure-benchmark|corruption-benchmark|rotate-package|rotation-recover|quota-benchmark|prune-archives|cleanup-rotation> [--out PATH] [--package PATH] [--archive-dir PATH] [--keep N] [--apply] [--quota-blocks N] [--copy-fallback] [--port N] [--parallel N] [--cycles N] [--kill-after-ms N] [--max-age-ms N] [--iterations N] [--synthetic] [--records N] [--evidence-mb N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
   process.exitCode = 2;
 }
 

@@ -1,7 +1,8 @@
-import { cp, mkdir, rename, rm } from 'node:fs/promises';
+import { cp, mkdir, readFile, rename, rm } from 'node:fs/promises';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { inspectSessionPackage } from './session-index.js';
+import { updateRotationMarker, writeRotationMarker, type RotationMarker } from './rotation-recovery.js';
 
 export interface PackageRotationResult {
   sourcePackage: string;
@@ -43,12 +44,41 @@ export async function rotateSessionPackage(
   }
   if (mode === 'copy-verify-remove') {
     const stagingArchive = resolve(archiveRoot, `.rotation-staging-${randomUUID()}`);
+    const markerId = randomUUID();
+    const sourceChecksum = await inspectionChecksum(sourcePackage);
+    const markerPath = await writeRotationMarker(archiveRoot, {
+      markerId,
+      sourcePackage,
+      stagingPackage: stagingArchive,
+      archivePackage,
+      sessionId: inspection.sessionId,
+      sourceChecksum,
+      phase: 'copying',
+    });
+    let marker: RotationMarker = {
+      schemaVersion: '1.0.0',
+      markerId,
+      sourcePackage,
+      stagingPackage: stagingArchive,
+      archivePackage,
+      sessionId: inspection.sessionId,
+      sourceChecksum,
+      phase: 'copying',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
     try {
       await cp(sourcePackage, stagingArchive, { recursive: true, errorOnExist: true });
       await inspectSessionPackage(stagingArchive);
+      await updateRotationMarker(markerPath, marker, 'verified');
+      marker = { ...marker, phase: 'verified' };
       await rename(stagingArchive, archivePackage);
       await inspectSessionPackage(archivePackage);
+      await updateRotationMarker(markerPath, marker, 'promoted');
+      marker = { ...marker, phase: 'promoted' };
       await rm(sourcePackage, { recursive: true, force: false });
+      await updateRotationMarker(markerPath, marker, 'source_removed');
+      await rm(markerPath, { force: true });
     } catch (error) {
       await rm(stagingArchive, { recursive: true, force: true });
       throw error;
@@ -62,4 +92,8 @@ export async function rotateSessionPackage(
     mode,
     counts: inspection.counts,
   };
+}
+
+async function inspectionChecksum(packageDirectory: string): Promise<string> {
+  return createHash('sha256').update(await readFile(resolve(packageDirectory, 'session-index.json'))).digest('hex');
 }

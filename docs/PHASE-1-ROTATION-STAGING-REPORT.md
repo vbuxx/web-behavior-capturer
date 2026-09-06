@@ -22,12 +22,18 @@ pnpm run cleanup:rotation -- \
 
 Cleanup tidak otomatis dijalankan oleh rotation; operator atau scheduler harus memanggilnya eksplisit.
 
+## Recovery marker
+
+Copy fallback kini membuat `.rotation-marker-<id>.json` dengan schema `1.0.0` dan phase `copying → verified → promoted → source_removed`. Marker ditulis melalui temporary file lalu atomic rename. Recovery dipisahkan dari janitor:
+
+```bash
+pnpm run recover:rotation -- --archive-dir .wbc/archive
+pnpm run recover:rotation -- --archive-dir .wbc/archive --apply
+```
+
+Default adalah dry-run. `--apply` hanya mempromosikan staging yang lolos inspection, atau menghapus source ketika archive sudah verified dan session ID serta checksum `session-index.json` identik. Marker/package corrupt atau checksum mismatch dilaporkan sebagai `quarantine` dan tidak dihapus.
+
 ## Limitations
 
-- Age threshold adalah safety heuristic; belum ada recovery marker berisi source/session metadata.
-- Staging yang sedang aktif lebih lama dari threshold dapat terhapus jika operator memilih threshold terlalu kecil.
-- Jika archive sudah dipromosikan tetapi source belum terhapus, janitor tidak melakukan deduplication otomatis.
-
-## Next gate
-
-Tambahkan rotation manifest marker, dry-run, dan recovery decision yang membedakan copy incomplete dari archive promoted/source retained.
+- Marker tidak membuat copy lintas filesystem menjadi atomik; hard crash dapat tetap meninggalkan artefak yang memerlukan keputusan operator.
+- Staging yang sedang aktif lebih lama dari threshold dapat terhapus jika operator memilih threshold janitor terlalu kecil; gunakan recovery marker lebih dulu.

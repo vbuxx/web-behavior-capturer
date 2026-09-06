@@ -24,6 +24,7 @@
     "benchmark:quota": "tsx src/cli.ts quota-benchmark",
     "prune:archives": "tsx src/cli.ts prune-archives",
     "cleanup:rotation": "tsx src/cli.ts cleanup-rotation",
+    "recover:rotation": "tsx src/cli.ts rotation-recover",
     "verify": "tsx src/cli.ts verify",
     "verify:replica": "tsx src/cli.ts verify --target replica",
     "probe": "tsx src/cli.ts probe",
