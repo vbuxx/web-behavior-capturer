@@ -13,6 +13,7 @@ export interface QuotaBenchmarkResult {
   finalOutputFileCount: number;
   finalOutputFiles: string[];
   stagingDirectoryCount: number;
+  orphanStagingDirectoryCount: number;
   rejectedByIntegrity: boolean;
   rejectionMessage: string;
   stderrTail: string;
@@ -88,6 +89,8 @@ export async function benchmarkFileSizeQuota(quotaBlocks = 256): Promise<QuotaBe
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
   const staging = await stagingDirectories(outputDirectory);
+  for (const directory of staging) await rm(directory, { recursive: true, force: true });
+  const remainingStagingDirectoryCount = (await stagingDirectories(outputDirectory)).length;
   await rm(root, { recursive: true, force: true });
   return {
     platform: process.platform,
@@ -97,7 +100,8 @@ export async function benchmarkFileSizeQuota(quotaBlocks = 256): Promise<QuotaBe
     childExitSignal: exit.signal,
     finalOutputFileCount,
     finalOutputFiles,
-    stagingDirectoryCount: staging.length,
+    stagingDirectoryCount: remainingStagingDirectoryCount,
+    orphanStagingDirectoryCount: staging.length,
     rejectedByIntegrity,
     rejectionMessage,
     stderrTail: Buffer.concat(stderrChunks).toString('utf8').slice(-1_000),
