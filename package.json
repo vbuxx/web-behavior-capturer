@@ -17,6 +17,7 @@
     "benchmark:capture": "tsx src/cli.ts capture-benchmark",
     "benchmark:reliability": "tsx src/cli.ts reliability-benchmark",
     "benchmark:crash": "tsx src/cli.ts crash-benchmark",
+    "cleanup:staging": "tsx src/cli.ts cleanup-staging",
     "verify": "tsx src/cli.ts verify",
     "verify:replica": "tsx src/cli.ts verify --target replica",
     "probe": "tsx src/cli.ts probe",

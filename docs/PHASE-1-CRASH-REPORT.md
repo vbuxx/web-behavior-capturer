@@ -32,6 +32,6 @@ Capture belum mencapai tahap package promotion ketika process dihentikan. Pada r
 - Belum ada disk-full, permission failure, process restart/resume, atau recovery dari package yang korup.
 - Startup dan resource contention memengaruhi kapan file pertama muncul; probe menunggu file parsial dan memakai 15,000 ms sebagai batas maksimum.
 
-## Scope revision
+## Recovery follow-up
 
-Sebelum service lifecycle/MCP job API, tambahkan janitor policy untuk staging orphan, disk-full simulation, dan recovery matrix (kill sebelum/selama/sesudah index build). Crash injection tetap menjadi regression gate pada setiap perubahan writer.
+`src/staging.ts` dan `pnpm run cleanup:staging` sekarang menyediakan janitor age-bounded. Default threshold 24 jam; staging yang lebih muda dipertahankan untuk menghindari penghapusan capture aktif. Sebelum service lifecycle/MCP job API, tambahkan disk-full simulation dan recovery matrix (kill sebelum/selama/sesudah index build). Crash injection tetap menjadi regression gate pada setiap perubahan writer.

@@ -15,4 +15,4 @@ Tambahkan crash-injection benchmark yang menjalankan capture sebagai child proce
 
 Dengan batas maksimum 15.000 ms, child berhenti dengan `SIGKILL` setelah menulis file evidence parsial, tidak menghasilkan exit code normal, dan output ditolak dengan `ENOENT` karena `session-index.json` belum ada. Ini membuktikan bahwa partial output tidak dipromosikan sebagai package valid.
 
-Orphan staging cleanup terjadwal, disk-full simulation, dan resume setelah restart menjadi gate berikutnya sebelum lifecycle service/MCP.
+Janitor age-bounded tersedia melalui `cleanup-staging` dengan default threshold 24 jam; orphan yang lebih muda dipertahankan. Disk-full simulation dan resume setelah restart menjadi gate berikutnya sebelum lifecycle service/MCP.
