@@ -15,11 +15,12 @@
     "benchmark:synthetic": "tsx src/cli.ts benchmark --synthetic",
     "benchmark:browser": "tsx src/cli.ts browser-benchmark",
     "benchmark:capture": "tsx src/cli.ts capture-benchmark",
+    "benchmark:reliability": "tsx src/cli.ts reliability-benchmark",
     "verify": "tsx src/cli.ts verify",
     "verify:replica": "tsx src/cli.ts verify --target replica",
     "probe": "tsx src/cli.ts probe",
-    "test": "tsx --test test/**/*.test.ts",
-    "test:e2e": "tsx --test test/e2e.test.ts"
+    "test": "tsx --test --test-concurrency=1 test/**/*.test.ts",
+    "test:e2e": "tsx --test --test-concurrency=1 test/e2e.test.ts"
   },
   "engines": {
     "node": ">=22.5"
