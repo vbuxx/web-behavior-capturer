@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { cp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { captureSession, CaptureCancelledError } from './capture.js';
@@ -145,6 +145,31 @@ export class SessionService {
     };
   }
 
+  async #writeProbeRevision(packagePath: string, reportPath: string): Promise<{ revisionId: string; contractPath: string; reportPath: string }> {
+    const packageRoot = resolve(this.#workspaceRoot, packagePath);
+    const index = await validateSessionIndexManifest(JSON.parse(await readFile(resolve(packageRoot, 'session-index.json'), 'utf8')));
+    const baseContract = await validateContract(JSON.parse(await readFile(resolve(packageRoot, index.contract.path), 'utf8')));
+    const revisionId = `revision-${randomUUID()}`;
+    const revisionRoot = resolve(packageRoot, 'revisions', revisionId);
+    await mkdir(revisionRoot, { recursive: true });
+    const revisionReportPath = resolve(revisionRoot, 'technical-probe-report.json');
+    await cp(reportPath, revisionReportPath);
+    const reportSha = createHash('sha256').update(await readFile(revisionReportPath)).digest('hex');
+    const relativeReportPath = `revisions/${revisionId}/technical-probe-report.json`;
+    const revisionContract: ContractPackage = {
+      ...baseContract,
+      manifest: {
+        ...baseContract.manifest,
+        revision: revisionId,
+        probeRun: { path: relativeReportPath, sha256: reportSha },
+      },
+    };
+    await validateContract(revisionContract);
+    const revisionContractPath = resolve(revisionRoot, 'behavior-contract.json');
+    await writeFile(revisionContractPath, `${JSON.stringify(revisionContract, null, 2)}\n`, 'utf8');
+    return { revisionId, contractPath: revisionContractPath, reportPath: revisionReportPath };
+  }
+
   async listBehaviors(packagePath: string, options: { kind?: BehaviorKind; limit?: number; offset?: number } = {}): Promise<{ snapshot: ImmutableSnapshot; behaviors: Awaited<ReturnType<typeof querySessionBehaviors>> }> {
     const snapshot = await this.#snapshot(packagePath);
     return { snapshot, behaviors: await querySessionBehaviors(resolve(this.#workspaceRoot, packagePath), options) };
@@ -165,11 +190,14 @@ export class SessionService {
     return { snapshot, page: await querySessionRecords(resolve(this.#workspaceRoot, packagePath), query) };
   }
 
-  async runProbe(): Promise<ServiceJob> {
+  async runProbe(packagePath = 'artifacts/phase1/latest'): Promise<ServiceJob> {
     const job = await this.#jobs.create('probe.run');
     const outputPath = resolve(this.#workspaceRoot, `.wbc/jobs/${job.jobId}/technical-probe-report.json`);
     void runTechnicalProbes(outputPath)
-      .then((report) => this.#jobs.update((current) => ({ ...(current ?? job), status: report.summary.failed === 0 ? 'completed' : 'failed', updatedAt: new Date().toISOString(), outputPath, result: { summary: report.summary } }), job.jobId))
+      .then(async (report) => {
+        const revision = await this.#writeProbeRevision(packagePath, outputPath);
+        return this.#jobs.update((current) => ({ ...(current ?? job), status: report.summary.failed === 0 ? 'completed' : 'failed', updatedAt: new Date().toISOString(), outputPath, result: { summary: report.summary, revisionId: revision.revisionId, contractPath: revision.contractPath } }), job.jobId);
+      })
       .catch((error: unknown) => this.#jobs.update((current) => ({ ...(current ?? job), status: 'failed', updatedAt: new Date().toISOString(), outputPath, error: { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error), stage: 'probe' } }), job.jobId));
     return { ...job, status: 'running', outputPath };
   }

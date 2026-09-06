@@ -120,6 +120,16 @@
             "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
           }
         },
+        "revision": { "type": "string", "minLength": 1 },
+        "probeRun": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
         "status": { "enum": ["running", "stopping", "finalizing", "completed", "cancelled", "failed"] },
         "resumedFromSessionId": { "type": "string", "minLength": 1 },
         "source": { "type": "object" },

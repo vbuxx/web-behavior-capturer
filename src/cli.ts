@@ -158,7 +158,7 @@ async function main(): Promise<void> {
 
   if (command === 'probe-run') {
     const { SessionService } = await import('./session-service.js');
-    console.log(JSON.stringify(await new SessionService().runProbe(), null, 2));
+    console.log(JSON.stringify(await new SessionService().runProbe(option('--package') ?? 'artifacts/phase1/latest'), null, 2));
     return;
   }
 

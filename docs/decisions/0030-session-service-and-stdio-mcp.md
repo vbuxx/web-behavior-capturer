@@ -11,4 +11,4 @@ Read operations first run package integrity inspection and return an immutable s
 
 ## Consequence
 
-Viewer integration can reuse the same service without changing package semantics. The current job store is intentionally local and single-host; distributed scheduling, authentication, and multi-user tenancy remain out of scope.
+Viewer integration can reuse the same service without changing package semantics. Probe jobs write a new derived contract revision and never replace the base contract. The current job store is intentionally local and single-host; distributed scheduling, authentication, and multi-user tenancy remain out of scope.

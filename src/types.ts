@@ -160,6 +160,8 @@ export interface CaptureManifest {
   navigationId: string;
   generatedAt: string;
   evidenceGraph?: { revision: string; path: string; sha256: string };
+  revision?: string;
+  probeRun?: { path: string; sha256: string };
   status?: CaptureSessionState;
   resumedFromSessionId?: string;
   source: {

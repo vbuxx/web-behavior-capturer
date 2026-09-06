@@ -25,7 +25,7 @@ async function dispatch(service: SessionService, method: string, params: Record<
   if (method === 'behavior.list') return service.listBehaviors(stringParam(params, 'packagePath')!, { ...(typeof params.kind === 'string' ? { kind: params.kind as never } : {}), ...(typeof params.limit === 'number' ? { limit: params.limit } : {}), ...(typeof params.offset === 'number' ? { offset: params.offset } : {}) });
   if (method === 'behavior.get') return service.getBehavior(stringParam(params, 'packagePath')!, stringParam(params, 'behaviorId')!);
   if (method === 'evidence.get') return service.getEvidence(stringParam(params, 'packagePath')!, params as never);
-  if (method === 'probe.run') return service.runProbe();
+  if (method === 'probe.run') return service.runProbe(typeof params.packagePath === 'string' ? params.packagePath : 'artifacts/phase1/latest');
   if (method === 'replica.verify') return service.verifyReplica(stringParam(params, 'packagePath')!);
   if (method === 'capture.export') return service.exportCapture(stringParam(params, 'sourcePath')!, stringParam(params, 'destinationPath')!);
   throw new Error(`Unknown MCP method: ${method}`);
