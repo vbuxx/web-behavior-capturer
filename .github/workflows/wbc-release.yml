@@ -30,9 +30,21 @@ jobs:
       - run: sudo mkdir -p "$WBC_QUOTA_ROOT"
       - run: sudo mount -t tmpfs -o size=128m tmpfs "$WBC_QUOTA_ROOT"
       - run: sudo chown "$USER" "$WBC_QUOTA_ROOT"
-      - run: pnpm run test:stress
+      - name: Run integrity and stress gates
+        run: |
+          mkdir -p .wbc-release-report
+          set -o pipefail
+          pnpm run test:stress 2>&1 | tee .wbc-release-report/stress.log
       - if: always()
-        run: uname -a && df -h "$WBC_QUOTA_ROOT"
+        run: |
+          uname -a | tee .wbc-release-report/runner.txt
+          df -h "$WBC_QUOTA_ROOT" | tee -a .wbc-release-report/runner.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wbc-release-integrity-${{ github.run_id }}
+          path: .wbc-release-report
+          if-no-files-found: warn
 
   performance-endurance:
     runs-on: ubuntu-latest
@@ -49,7 +61,20 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm run test:performance
-      - run: pnpm run test:endurance
+      - name: Run performance and endurance gates
+        run: |
+          mkdir -p .wbc-release-report
+          set -o pipefail
+          pnpm run test:performance 2>&1 | tee .wbc-release-report/performance.log
+          pnpm run test:endurance 2>&1 | tee .wbc-release-report/endurance.log
       - if: always()
-        run: uname -a && node --version && pnpm --version
+        run: |
+          uname -a | tee .wbc-release-report/runner.txt
+          node --version | tee -a .wbc-release-report/runner.txt
+          pnpm --version | tee -a .wbc-release-report/runner.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wbc-release-performance-${{ github.run_id }}
+          path: .wbc-release-report
+          if-no-files-found: warn

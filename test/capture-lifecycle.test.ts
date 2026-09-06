@@ -64,3 +64,52 @@ test('resume metadata requires a checkpoint and creates a new session revision',
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('cancellation during stream flush is deterministic and removes staging', { timeout: 60_000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'wbc-cancel-flush-'));
+  const output = join(root, 'cancelled-flush');
+  const controller = new AbortController();
+  const phases: string[] = [];
+  try {
+    await assert.rejects(
+      captureSession(output, {
+        enduranceDurationMs: 1_000,
+        overheadRuns: 1,
+        signal: controller.signal,
+        onPhase: (phase) => {
+          phases.push(phase);
+          if (phase === 'before-stream-stop') controller.abort();
+        },
+      }),
+      (error: unknown) => error instanceof CaptureCancelledError,
+    );
+    assert.deepEqual(phases, ['before-stream-stop']);
+    assert.equal((await readdir(root)).some((entry) => entry.startsWith('cancelled-flush.staging-')), false);
+    assert.equal((await readdir(root)).includes('cancelled-flush'), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('cancellation immediately before promotion never publishes a package', { timeout: 60_000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'wbc-cancel-promote-'));
+  const output = join(root, 'cancelled-promote');
+  const controller = new AbortController();
+  try {
+    await assert.rejects(
+      captureSession(output, {
+        enduranceDurationMs: 1_000,
+        overheadRuns: 1,
+        signal: controller.signal,
+        onPhase: (phase) => {
+          if (phase === 'before-promotion') controller.abort();
+        },
+      }),
+      (error: unknown) => error instanceof CaptureCancelledError,
+    );
+    assert.equal((await readdir(root)).some((entry) => entry.startsWith('cancelled-promote.staging-')), false);
+    assert.equal((await readdir(root)).includes('cancelled-promote'), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

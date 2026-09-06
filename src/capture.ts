@@ -587,6 +587,8 @@ export interface CaptureOptions {
   resumeCheckpoint?: string;
   resumePackagePath?: string;
   enduranceDurationMs?: number;
+  /** Test/diagnostic hook for deterministic cancellation and lifecycle probes. */
+  onPhase?: (phase: 'before-stream-stop' | 'before-finalization' | 'before-promotion') => void | Promise<void>;
 }
 
 export class CaptureCancelledError extends Error {
@@ -626,6 +628,10 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
       setState('cancelled');
       throw new CaptureCancelledError();
     }
+  };
+  const phase = async (name: 'before-stream-stop' | 'before-finalization' | 'before-promotion'): Promise<void> => {
+    await options.onPhase?.(name);
+    throwIfCancelled();
   };
   throwIfCancelled();
   const evidenceDirectory = join(stagingDirectory, 'evidence');
@@ -788,6 +794,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
       recorder.record('input', 'endurance-completed', { ...endurance });
     }
 
+    await phase('before-stream-stop');
     await targetRegistry.stopStreaming();
     const targets = await targetRegistry.collect();
     for (const { targetId, record } of targets.records) recorder.ingest(record, targetId);
@@ -821,6 +828,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     const sessionId = randomUUID();
     const browserVersion = browser.version();
     const finalizationStarted = performance.now();
+    await phase('before-finalization');
     setState('finalizing');
     throwIfCancelled();
     const contract: ContractPackage = {
@@ -926,6 +934,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     await buildSessionIndex(stagingDirectory, contractPath, contract, recorder.records, evidenceGraphPath);
     finalizationMs = Number((performance.now() - finalizationStarted).toFixed(3));
     await context.close();
+    await phase('before-promotion');
     await rename(stagingDirectory, absoluteOutput);
     promoted = true;
     setState('completed');
