@@ -127,7 +127,7 @@ export interface Behavior {
 
 export interface CaptureManifest {
   productVersion: string;
-  schemaVersion: '1.2.0';
+  schemaVersion: '1.3.0';
   sessionId: string;
   navigationId: string;
   generatedAt: string;
@@ -152,6 +152,12 @@ export interface CaptureManifest {
     detail?: string;
   }>;
   targetCoverage: TargetCoverage[];
+  redaction: {
+    policyVersion: '1.0.0';
+    replacement: '[REDACTED]';
+    redactedValues: number;
+    categories: string[];
+  };
   quality: {
     recordCount: number;
     droppedRecords: number;
@@ -167,7 +173,7 @@ export interface CaptureManifest {
 }
 
 export interface ContractPackage {
-  schemaVersion: '1.2.0';
+  schemaVersion: '1.3.0';
   manifest: CaptureManifest;
   elements: ElementRef[];
   behaviors: Behavior[];

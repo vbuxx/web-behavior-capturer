@@ -21,6 +21,34 @@ export interface SessionInspection {
   }>;
 }
 
+export interface SessionRecordQuery {
+  sourceTargetId?: string;
+  type?: string;
+  targetRef?: string;
+  fromSourceTime?: number;
+  toSourceTime?: number;
+  limit?: number;
+  byteBudget?: number;
+  cursor?: string;
+}
+
+export interface SessionRecordPage {
+  revision: string;
+  records: Array<{
+    recordId: string;
+    source: string;
+    type: string;
+    targetRef: string | null;
+    sourceTargetId: string | null;
+    sourceTime: number;
+    receiveTime: number;
+    payload: Record<string, unknown>;
+  }>;
+  returnedBytes: number;
+  nextCursor: string | null;
+  truncatedBy: 'records' | 'bytes' | null;
+}
+
 async function sha256(path: string): Promise<string> {
   return createHash('sha256').update(await readFile(path)).digest('hex');
 }
@@ -252,6 +280,126 @@ export async function querySessionBehaviors(
       SELECT behavior_id AS behaviorId, kind, target_ref AS targetRef
       FROM behaviors ORDER BY behavior_id LIMIT ? OFFSET ?
     `).all(limit, offset) as SessionInspection['behaviors'];
+  } finally {
+    database.close();
+  }
+}
+
+function querySignature(options: SessionRecordQuery): string {
+  return JSON.stringify({
+    sourceTargetId: options.sourceTargetId ?? null,
+    type: options.type ?? null,
+    targetRef: options.targetRef ?? null,
+    fromSourceTime: options.fromSourceTime ?? null,
+    toSourceTime: options.toSourceTime ?? null,
+  });
+}
+
+function encodeCursor(value: { revision: string; signature: string; offset: number }): string {
+  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
+}
+
+function decodeCursor(value: string): { revision: string; signature: string; offset: number } {
+  try {
+    const decoded = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as Record<string, unknown>;
+    if (typeof decoded.revision !== 'string' || typeof decoded.signature !== 'string'
+      || typeof decoded.offset !== 'number' || !Number.isInteger(decoded.offset) || decoded.offset < 0) {
+      throw new Error('invalid shape');
+    }
+    return { revision: decoded.revision, signature: decoded.signature, offset: decoded.offset };
+  } catch {
+    throw new Error('Invalid evidence query cursor');
+  }
+}
+
+export async function querySessionRecords(
+  packageDirectory: string,
+  options: SessionRecordQuery = {},
+): Promise<SessionRecordPage> {
+  if ((options.fromSourceTime !== undefined && !Number.isFinite(options.fromSourceTime))
+    || (options.toSourceTime !== undefined && !Number.isFinite(options.toSourceTime))) {
+    throw new Error('Source-time filters must be finite numbers');
+  }
+  if (options.fromSourceTime !== undefined && options.toSourceTime !== undefined
+    && options.fromSourceTime > options.toSourceTime) {
+    throw new Error('Source-time range is inverted');
+  }
+  await inspectSessionPackage(packageDirectory);
+  const manifest = await validateSessionIndexManifest(JSON.parse(await readFile(resolve(packageDirectory, 'session-index.json'), 'utf8')));
+  const signature = querySignature(options);
+  const decodedCursor = options.cursor ? decodeCursor(options.cursor) : undefined;
+  if (decodedCursor && decodedCursor.revision !== manifest.database.sha256) throw new Error('Evidence query cursor revision is stale');
+  if (decodedCursor && decodedCursor.signature !== signature) throw new Error('Evidence query cursor does not match filters');
+
+  const requestedLimit = options.limit ?? 50;
+  const requestedBudget = options.byteBudget ?? 64 * 1024;
+  if (!Number.isFinite(requestedLimit) || !Number.isFinite(requestedBudget)) throw new Error('Query limits must be finite numbers');
+  const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
+  const byteBudget = Math.min(1024 * 1024, Math.max(1, Math.floor(requestedBudget)));
+  const offset = decodedCursor?.offset ?? 0;
+
+  const clauses: string[] = [];
+  const parameters: Array<string | number> = [];
+  if (options.sourceTargetId) { clauses.push('source_target_id = ?'); parameters.push(options.sourceTargetId); }
+  if (options.type) { clauses.push('type = ?'); parameters.push(options.type); }
+  if (options.targetRef) { clauses.push('target_ref = ?'); parameters.push(options.targetRef); }
+  if (options.fromSourceTime !== undefined) { clauses.push('source_time >= ?'); parameters.push(options.fromSourceTime); }
+  if (options.toSourceTime !== undefined) { clauses.push('source_time <= ?'); parameters.push(options.toSourceTime); }
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+
+  const databasePath = resolveInside(packageDirectory, manifest.database.path);
+  const database = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    const rows = database.prepare(`
+      SELECT record_id AS recordId, source, type, target_ref AS targetRef,
+             source_target_id AS sourceTargetId, source_time AS sourceTime,
+             receive_time AS receiveTime, payload_json AS payloadJson
+      FROM records ${where}
+      ORDER BY receive_time, record_id
+      LIMIT ? OFFSET ?
+    `).all(...parameters, limit + 1, offset) as Array<{
+      recordId: string;
+      source: string;
+      type: string;
+      targetRef: string | null;
+      sourceTargetId: string | null;
+      sourceTime: number;
+      receiveTime: number;
+      payloadJson: string;
+    }>;
+
+    const records: SessionRecordPage['records'] = [];
+    let returnedBytes = 0;
+    let truncatedBy: SessionRecordPage['truncatedBy'] = null;
+    for (const row of rows.slice(0, limit)) {
+      const record = {
+        recordId: row.recordId,
+        source: row.source,
+        type: row.type,
+        targetRef: row.targetRef,
+        sourceTargetId: row.sourceTargetId,
+        sourceTime: row.sourceTime,
+        receiveTime: row.receiveTime,
+        payload: JSON.parse(row.payloadJson) as Record<string, unknown>,
+      };
+      const bytes = Buffer.byteLength(JSON.stringify(record), 'utf8');
+      if (returnedBytes + bytes > byteBudget) {
+        if (records.length === 0) throw new Error(`First evidence record exceeds byte budget (${bytes} > ${byteBudget})`);
+        truncatedBy = 'bytes';
+        break;
+      }
+      records.push(record);
+      returnedBytes += bytes;
+    }
+    if (!truncatedBy && rows.length > records.length) truncatedBy = 'records';
+    const nextOffset = offset + records.length;
+    return {
+      revision: manifest.database.sha256,
+      records,
+      returnedBytes,
+      nextCursor: truncatedBy ? encodeCursor({ revision: manifest.database.sha256, signature, offset: nextOffset }) : null,
+      truncatedBy,
+    };
   } finally {
     database.close();
   }

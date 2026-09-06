@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://wbc.local/schema/behavior-contract-1.2.0.json",
+  "$id": "https://wbc.local/schema/behavior-contract-1.3.0.json",
   "title": "Website Behavior Capture Contract Package",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "manifest", "elements", "behaviors", "evidenceIndex"],
   "properties": {
-    "schemaVersion": { "const": "1.2.0" },
+    "schemaVersion": { "const": "1.3.0" },
     "manifest": { "$ref": "#/$defs/manifest" },
     "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } },
     "behaviors": {
@@ -103,10 +103,10 @@
     "manifest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["productVersion", "schemaVersion", "sessionId", "navigationId", "generatedAt", "source", "environment", "captureMode", "capabilities", "targetCoverage", "quality", "gaps"],
+      "required": ["productVersion", "schemaVersion", "sessionId", "navigationId", "generatedAt", "source", "environment", "captureMode", "capabilities", "targetCoverage", "redaction", "quality", "gaps"],
       "properties": {
         "productVersion": { "type": "string" },
-        "schemaVersion": { "const": "1.2.0" },
+        "schemaVersion": { "const": "1.3.0" },
         "sessionId": { "type": "string" },
         "navigationId": { "type": "string" },
         "generatedAt": { "type": "string", "format": "date-time" },
@@ -129,6 +129,21 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/targetCoverage" }
+        },
+        "redaction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["policyVersion", "replacement", "redactedValues", "categories"],
+          "properties": {
+            "policyVersion": { "const": "1.0.0" },
+            "replacement": { "const": "[REDACTED]" },
+            "redactedValues": { "type": "integer", "minimum": 0 },
+            "categories": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "enum": ["authorization", "cookie", "credential", "personal_data", "session", "token"] }
+            }
+          }
         },
         "quality": { "type": "object" },
         "gaps": { "type": "array", "items": { "type": "string" } }

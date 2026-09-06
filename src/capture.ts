@@ -6,6 +6,7 @@ import { installPageObserver, measureFrameIntervals } from './browser-observer.j
 import { startFixtureServer } from './server.js';
 import { buildSessionIndex } from './session-index.js';
 import { TargetRegistry } from './target-registry.js';
+import { Redactor } from './redaction.js';
 import { validateContract } from './validate.js';
 import type {
   Behavior,
@@ -46,6 +47,8 @@ class EvidenceRecorder {
   readonly files: EvidenceFile[] = [];
   #sequence = 0;
 
+  constructor(private readonly redactor: Redactor) {}
+
   record(
     source: EvidenceRecord['source'],
     type: string,
@@ -62,7 +65,7 @@ class EvidenceRecorder {
       sourceTime,
       receiveTime: Date.now(),
       type,
-      payload,
+      payload: this.redactor.redact(payload),
     };
     if (targetRef) record.targetRef = targetRef;
     this.records.push(record);
@@ -78,7 +81,7 @@ class EvidenceRecorder {
       sequence: this.#sequence,
       ...(record.targetRef ? { targetRef: record.targetRef } : {}),
       payload: {
-        ...record.payload,
+        ...this.redactor.redact(record.payload),
         sourceRecordId: record.id,
         sourceSequence: record.sequence,
         sourceTargetId: targetId,
@@ -533,7 +536,8 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
 
   const server = await startFixtureServer();
   const browser = await chromium.launch({ headless: true, args: ['--site-per-process'] });
-  const recorder = new EvidenceRecorder();
+  const redactor = new Redactor();
+  const recorder = new EvidenceRecorder(redactor);
   try {
     const overhead = await benchmarkObserver(browser, server.url, options.overheadRuns ?? 3);
     const context = await browser.newContext({
@@ -596,7 +600,8 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
 
     const targets = await targetRegistry.collect();
     for (const { targetId, record } of targets.records) recorder.ingest(record, targetId);
-    for (const target of targets.coverage) {
+    const targetCoverage = redactor.redact(targets.coverage);
+    for (const target of targetCoverage) {
       recorder.record('page', 'target-coverage', { target }, target.targetId);
     }
 
@@ -624,14 +629,14 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     const sessionId = randomUUID();
     const browserVersion = browser.version();
     const contract: ContractPackage = {
-      schemaVersion: '1.2.0',
+      schemaVersion: '1.3.0',
       manifest: {
-        productVersion: '0.2.0-phase1',
-        schemaVersion: '1.2.0',
+        productVersion: '0.3.0-phase1',
+        schemaVersion: '1.3.0',
         sessionId,
         navigationId: 'nav-1',
         generatedAt: new Date().toISOString(),
-        source: { url: server.url, fixture: 'phase0' },
+        source: { url: redactor.redact(server.url, 'url'), fixture: 'phase0' },
         environment: {
           browserName: 'chromium', browserVersion, platform: process.platform,
           viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1,
@@ -652,12 +657,15 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           { name: 'dedicated_worker_collector', status: 'supported', detail: 'Installed after the Playwright worker event; pre-install history remains a declared gap.' },
           { name: 'recursive_worker_collector', status: 'unavailable', detail: 'Workers spawned by another worker are not recursively instrumented.' },
           { name: 'sqlite_session_index', status: 'supported', detail: 'Reopenable sidecar index built with node:sqlite; runtime API is still marked experimental.' },
+          { name: 'structured_data_redaction', status: 'supported', detail: 'Sensitive keys, header-style values, bearer tokens, and credential query parameters are redacted before persistence.' },
+          { name: 'visual_redaction', status: 'not_attempted', detail: 'Screenshot regions are not OCR-scanned or blurred.' },
         ],
-        targetCoverage: targets.coverage,
+        targetCoverage,
+        redaction: redactor.summary(),
         quality: {
           recordCount: recorder.records.length,
-          droppedRecords: targets.coverage.reduce((sum, target) => sum + target.collector.droppedRecords, 0),
-          knownLoss: targets.coverage.some((target) => target.collector.knownLoss),
+          droppedRecords: targetCoverage.reduce((sum, target) => sum + target.collector.droppedRecords, 0),
+          knownLoss: targetCoverage.some((target) => target.collector.knownLoss),
           observerCost: {
             baselineP95FrameMs: round(baselineP95),
             captureP95FrameMs: round(captureP95),
@@ -676,6 +684,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           'GSAP semantic extraction requires an accessible public adapter; private instances use sampled fallback.',
           'Observer overhead benchmark includes page-world frame observers but not the host registry or worker collector installation.',
           'The SQLite API is experimental in the pinned Node.js runtime; the sidecar format may require migration before release.',
+          'Redaction covers structured evidence and URL query parameters; visual evidence and arbitrary text content are not redacted.',
           'No MCP server or viewer is included in the current slice.',
         ],
       },

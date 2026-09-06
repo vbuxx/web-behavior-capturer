@@ -1,6 +1,6 @@
 {
   "name": "website-behavior-capture",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Local capture and verification engine for Website Behavior Capture",
@@ -9,6 +9,7 @@
     "capture": "tsx src/cli.ts capture",
     "inspect": "tsx src/cli.ts inspect",
     "query": "tsx src/cli.ts query",
+    "evidence": "tsx src/cli.ts evidence",
     "verify": "tsx src/cli.ts verify",
     "verify:replica": "tsx src/cli.ts verify --target replica",
     "probe": "tsx src/cli.ts probe",

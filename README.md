@@ -14,7 +14,7 @@ Lima perilaku yang menjadi exit criterion spike sudah dapat ditangkap dan diveri
 - scroll reveal dengan reverse probe;
 - GSAP ScrollTrigger dengan `scrub: true`.
 
-Fase 0 telah selesai. Fase 1 sekarang membawa target registry, lifecycle lintas navigasi, dan reopenable session index ke natural capture. Behavior Contract schema 1.2.0 mencatat main frame, iframe bertingkat, cross-origin OOPIF, dedicated worker, dan histori navigation epoch dengan status collector, clock mapping, attach/end boundary, record/drop count, completeness, parent target, dan gap per target. SQLite sidecar menyediakan query tanpa membuka website sumber.
+Fase 0 telah selesai. Fase 1 sekarang membawa target registry, lifecycle lintas navigasi, reopenable session index, dan structured-data redaction ke natural capture. Behavior Contract schema 1.3.0 mencatat main frame, iframe bertingkat, cross-origin OOPIF, dedicated worker, histori navigation epoch, status collector, clock mapping, loss, serta ringkasan redaction. SQLite sidecar menyediakan query tanpa membuka website sumber.
 
 Hasil terbaru tersedia di [artifacts/phase1/latest/behavior-contract.json](artifacts/phase1/latest/behavior-contract.json), [artifacts/phase1/latest/verification-reference.json](artifacts/phase1/latest/verification-reference.json), [artifacts/phase1/latest/verification-replica.json](artifacts/phase1/latest/verification-replica.json), dan [artifacts/phase1/latest/technical-probe-report.json](artifacts/phase1/latest/technical-probe-report.json). Kedua target verifikasi lulus 5/5 dan technical probe diagnostik lulus 10/10. Baseline Fase 0 tetap disimpan di `artifacts/phase0/latest`.
 
@@ -29,6 +29,7 @@ pnpm run build
 pnpm run capture -- --out .wbc/phase1
 pnpm run inspect -- --package .wbc/phase1
 pnpm run query -- --package .wbc/phase1 --kind gsap_scrub --limit 10
+pnpm run evidence -- --package .wbc/phase1 --type mutation --limit 20 --byte-budget 65536
 pnpm run verify -- --contract .wbc/phase1/behavior-contract.json --target reference
 pnpm run verify:replica -- --contract .wbc/phase1/behavior-contract.json
 pnpm run probe -- --out .wbc/phase1/technical-probe-report.json
@@ -48,10 +49,11 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `src/capture.ts` mengorkestrasi browser, target registry, collector, compiler, evidence, dan pengukuran overhead.
 - `src/target-registry.ts` membentuk pohon frame/worker serta coverage, clock, dan loss per target.
 - `src/session-index.ts` membangun, membuka ulang, dan memverifikasi SQLite sidecar serta query behavior terfilter.
+- `src/redaction.ts` menghapus credential terstruktur sebelum data masuk JSONL, contract, atau SQLite.
 - `src/verify.ts` menjalankan skenario held-out terhadap fixture baru.
 - `src/scenarios.ts` memvalidasi dan membaca suite skenario JSON berversi.
 - `src/browser-observer.ts` memasang page-world observer sebelum script fixture.
-- `schema/behavior-contract.schema.json` mendefinisikan kontrak JSON 1.2.0.
+- `schema/behavior-contract.schema.json` mendefinisikan kontrak JSON 1.3.0.
 - `schema/session-index.schema.json` mendefinisikan manifest checksum untuk reopenable index.
 - `fixtures/phase0` berisi ground-truth lokal dan GSAP yang disajikan dari dependency lokal.
 - `fixtures/replica` berisi implementasi independen tanpa GSAP dan tanpa selector sumber yang sama.
@@ -65,10 +67,14 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0005-natural-target-registry.md` menetapkan model registry dan migrasi schema 1.1.0.
 - `docs/decisions/0006-navigation-epochs-and-detach.md` menetapkan lifecycle target dan migrasi schema 1.2.0.
 - `docs/decisions/0007-reopenable-session-index.md` menetapkan desain SQLite sidecar sementara.
+- `docs/decisions/0008-structured-redaction-boundary.md` menetapkan redaction boundary dan batas visual.
+- `docs/decisions/0009-budgeted-evidence-query.md` menetapkan filter, cursor revision, serta record/byte budget.
 - `docs/PHASE-0-REPORT.md` berisi hasil, keterbatasan, overhead, dan revisi scope.
 - `docs/PHASE-1-FOUNDATION-REPORT.md` berisi hasil irisan fondasi capture pertama.
 - `docs/PHASE-1-LIFECYCLE-REPORT.md` berisi hasil navigation epoch dan detach coverage.
 - `docs/PHASE-1-INDEX-REPORT.md` berisi hasil reopen, integrity verification, dan query index.
+- `docs/PHASE-1-REDACTION-REPORT.md` berisi kebijakan, bukti integrasi, dan residual risk redaction.
+- `docs/PHASE-1-QUERY-REPORT.md` berisi hasil evidence query dan pagination integrity.
 
 ## Batas interpretasi
 

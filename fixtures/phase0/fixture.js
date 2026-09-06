@@ -52,7 +52,7 @@ captureWorker.addEventListener('message', (event) => {
   output.dataset.workerTime = String(event.data.workerTime);
 });
 
-fetch('/probe-config.json')
+fetch('/probe-config.json?redaction=1')
   .then((response) => response.json())
   .then((config) => {
     document.querySelector('[data-capture-cross-origin-frame]').src = config.crossOriginFrameUrl;

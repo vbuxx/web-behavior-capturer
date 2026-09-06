@@ -60,7 +60,8 @@ export async function startFixtureServer(): Promise<FixtureServer> {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     if (url.pathname === '/probe-config.json') {
       response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      response.end(JSON.stringify({ crossOriginFrameUrl: `${crossOriginUrl}/cross-origin-frame/` }));
+      const redactionProbe = url.searchParams.get('redaction') === '1' ? '?access_token=fixture-secret' : '';
+      response.end(JSON.stringify({ crossOriginFrameUrl: `${crossOriginUrl}/cross-origin-frame/${redactionProbe}` }));
       return;
     }
     const file = routes[url.pathname];

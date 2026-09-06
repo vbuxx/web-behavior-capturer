@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { captureSession } from '../src/capture.js';
 import { runTechnicalProbes } from '../src/probes.js';
-import { inspectSessionPackage, querySessionBehaviors } from '../src/session-index.js';
+import { inspectSessionPackage, querySessionBehaviors, querySessionRecords } from '../src/session-index.js';
 import { validateContract } from '../src/validate.js';
 import { verifyPhase0 } from '../src/verify.js';
 
@@ -14,7 +14,11 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
   try {
     const capture = await captureSession(temporaryDirectory);
     const contract = await validateContract(JSON.parse(await readFile(capture.contractPath, 'utf8')));
-    assert.equal(contract.schemaVersion, '1.2.0');
+    assert.equal(contract.schemaVersion, '1.3.0');
+    assert.equal(contract.manifest.redaction.policyVersion, '1.0.0');
+    assert.ok(contract.manifest.redaction.redactedValues > 0);
+    assert.ok(contract.manifest.redaction.categories.includes('token'));
+    assert.doesNotMatch(JSON.stringify(contract), /fixture-secret/);
     assert.deepEqual(
       new Set(contract.behaviors.map((behavior) => behavior.kind)),
       new Set(['hover', 'css_animation', 'interrupted_transition', 'scroll_reveal', 'gsap_scrub']),
@@ -87,6 +91,8 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
     assert.match(events, /"type":"gsap-scrub-sample"/);
     assert.match(events, /"type":"target-coverage"/);
     assert.match(events, /"sourceTargetId":"nav-1:frame-/);
+    assert.doesNotMatch(events, /fixture-secret/);
+    assert.equal((await readFile(capture.sessionIndexPath)).includes(Buffer.from('fixture-secret')), false);
 
     const inspection = await inspectSessionPackage(temporaryDirectory);
     assert.equal(inspection.integrity, 'verified');
@@ -98,6 +104,30 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
     });
     const queriedGsap = await querySessionBehaviors(temporaryDirectory, { kind: 'gsap_scrub', limit: 1 });
     assert.deepEqual(queriedGsap.map((behavior) => behavior.behaviorId), ['gsap-scrolltrigger-scrub']);
+    const firstEvidencePage = await querySessionRecords(temporaryDirectory, { limit: 2, byteBudget: 32_000 });
+    assert.equal(firstEvidencePage.records.length, 2);
+    assert.ok(firstEvidencePage.nextCursor);
+    assert.equal(firstEvidencePage.truncatedBy, 'records');
+    assert.ok(firstEvidencePage.returnedBytes <= 32_000);
+    const secondEvidencePage = await querySessionRecords(temporaryDirectory, {
+      limit: 2,
+      byteBudget: 32_000,
+      cursor: firstEvidencePage.nextCursor!,
+    });
+    assert.equal(secondEvidencePage.records.length, 2);
+    assert.notEqual(firstEvidencePage.records[0]?.recordId, secondEvidencePage.records[0]?.recordId);
+    await assert.rejects(
+      querySessionRecords(temporaryDirectory, { type: 'mutation', cursor: firstEvidencePage.nextCursor! }),
+      /cursor does not match filters/,
+    );
+    const crossFrameEvidence = await querySessionRecords(temporaryDirectory, {
+      sourceTargetId: crossOriginTarget!.targetId,
+      type: 'mutation',
+      limit: 5,
+    });
+    assert.ok(crossFrameEvidence.records.length > 0);
+    assert.ok(crossFrameEvidence.records.every((record) => record.sourceTargetId === crossOriginTarget!.targetId));
+    await assert.rejects(querySessionRecords(temporaryDirectory, { byteBudget: 1 }), /exceeds byte budget/);
 
     const referenceReport = await verifyPhase0(capture.contractPath, { target: 'reference' });
     assert.deepEqual(referenceReport.summary, { passed: 5, failed: 0, total: 5 });

@@ -1,5 +1,7 @@
 # Phase 1 Index Report — Reopenable Session Package
 
+Status: completed. Persistence redaction continues in [PHASE-1-REDACTION-REPORT.md](PHASE-1-REDACTION-REPORT.md).
+
 ## Outcome
 
 Natural capture sekarang menghasilkan `session.sqlite` dan `session-index.json` di samping Behavior Contract dan evidence. Paket dapat dibuka kembali melalui CLI tanpa mengunjungi fixture sumber. Inspection menolak paket sebelum query jika checksum, schema, semantic reference, metadata, atau row count tidak konsisten.
@@ -14,7 +16,7 @@ Artefak terakhir berukuran sekitar 524 KB. SQLite berukuran 224 KB dan mengindek
 - evidence path, media type, dan checksum;
 - normalized input, page, WAAPI, CDP, adapter, dan lifecycle records.
 
-Query awal mendukung filter behavior kind, limit 1–100, dan offset. SQLite dibuka read-only setelah integrity inspection berhasil.
+Query behavior mendukung filter kind, limit 1–100, dan offset. Evidence query berbujet dilanjutkan pada [PHASE-1-QUERY-REPORT.md](PHASE-1-QUERY-REPORT.md). SQLite dibuka read-only setelah integrity inspection berhasil.
 
 ## Verification
 
@@ -28,7 +30,7 @@ Query awal mendukung filter behavior kind, limit 1–100, dan offset. SQLite dib
 
 - `node:sqlite` masih experimental pada runtime lokal; driver belum layak dianggap API distribusi final.
 - Session index belum memiliki revision, cancellation, atau concurrent writer.
-- Query baru mencakup behavior list; evidence range, target filter, dan pagination cursor belum tersedia.
+- Evidence range, target filter, dan pagination cursor tersedia pada slice berikutnya; revision concurrency lintas writer belum tersedia.
 - Tidak ada redaction policy sebelum payload masuk JSONL/SQLite.
 - Database bukan source of truth; ia dibangun dari contract dan evidence agar dapat diganti.
 
