@@ -48,7 +48,6 @@ export async function benchmarkFileSizeQuota(quotaBlocks = 256): Promise<QuotaBe
   await mkdir(quotaRoot, { recursive: true });
   const root = await mkdtemp(join(quotaRoot, 'wbc-quota-benchmark-'));
   const outputDirectory = join(root, 'capture');
-  await mkdir(outputDirectory);
   const cliPath = fileURLToPath(new URL('./cli.ts', import.meta.url));
   const repoRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
   const command = `ulimit -f ${quotaBlocks}; exec ${shellQuote(process.execPath)} --import tsx/esm ${shellQuote(cliPath)} capture --out ${shellQuote(outputDirectory)} --overhead-runs 1`;
@@ -66,7 +65,15 @@ export async function benchmarkFileSizeQuota(quotaBlocks = 256): Promise<QuotaBe
     rejectedByIntegrity = true;
     rejectionMessage = error instanceof Error ? error.message : String(error);
   }
-  const finalOutputFileCount = await fileCount(outputDirectory);
+  // Do not pre-create the destination: capture promotion is an atomic directory
+  // rename, and an existing destination would turn a quota failure into a
+  // misleading EEXIST path. A failed capture may leave no destination at all.
+  let finalOutputFileCount = 0;
+  try {
+    finalOutputFileCount = await fileCount(outputDirectory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
   const staging = await stagingDirectories(outputDirectory);
   await rm(root, { recursive: true, force: true });
   return {
