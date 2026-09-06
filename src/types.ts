@@ -204,6 +204,9 @@ export interface CaptureManifest {
       batchSize: number;
       queueCapacity: number;
       coalescedRecordTypes: string[];
+      batchCount?: number;
+      coalescedRecords?: number;
+      hostDroppedRecords?: number;
     };
   };
   visualRedaction?: {

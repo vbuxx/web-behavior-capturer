@@ -1,5 +1,5 @@
 import type { Frame, Page, Worker } from 'playwright';
-import { readPageObserver, type PageObserverState } from './browser-observer.js';
+import { drainPageObserver, readPageObserver, type PageObserverState } from './browser-observer.js';
 import type { CaptureTargetKind, ElementRef, EvidenceRecord, TargetCoverage } from './types.js';
 
 interface WorkerObserverState {
@@ -92,6 +92,16 @@ export interface TargetRegistrySnapshot {
   coverage: TargetCoverage[];
   records: CollectedTargetRecord[];
   elements: ElementRef[];
+  streaming: {
+    mode: 'host_batch';
+    flushIntervalMs: number;
+    batchSize: number;
+    queueCapacity: number;
+    coalescedRecordTypes: string[];
+    batchCount: number;
+    coalescedRecords: number;
+    hostDroppedRecords: number;
+  };
 }
 
 function clockMapping(snapshot: RealmSnapshot<unknown>): NonNullable<TargetCoverage['clockMapping']> | undefined {
@@ -134,6 +144,15 @@ export class TargetRegistry {
   #nextFrame = 0;
   #nextWorker = 0;
   #mainEpoch = 1;
+  #streamTimer: NodeJS.Timeout | undefined;
+  #streamDrain: Promise<void> | undefined;
+  #streamQueue: CollectedTargetRecord[] = [];
+  #streamedRecords: CollectedTargetRecord[] = [];
+  #streamBatchCount = 0;
+  #streamCoalescedRecords = 0;
+  #streamHostDroppedRecords = 0;
+  #streamDroppedByTarget = new Map<string, number>();
+  #streamingConfig = { flushIntervalMs: 50, batchSize: 128, queueCapacity: 10_000 };
 
   constructor(page: Page, maxRecords = 10_000) {
     this.#page = page;
@@ -143,6 +162,97 @@ export class TargetRegistry {
     page.on('framenavigated', (frame) => this.#handleFrameNavigation(frame));
     page.on('framedetached', (frame) => this.#archiveFrame(frame, 'detached'));
     page.on('worker', (worker) => this.#registerWorker(worker));
+  }
+
+  startStreaming(options: { flushIntervalMs?: number; batchSize?: number; queueCapacity?: number } = {}): void {
+    if (this.#streamTimer) return;
+    this.#streamingConfig = {
+      flushIntervalMs: options.flushIntervalMs ?? 50,
+      batchSize: options.batchSize ?? 128,
+      queueCapacity: options.queueCapacity ?? 10_000,
+    };
+    if (!Number.isInteger(this.#streamingConfig.flushIntervalMs) || this.#streamingConfig.flushIntervalMs < 1) {
+      throw new Error('Streaming flush interval must be a positive integer');
+    }
+    if (!Number.isInteger(this.#streamingConfig.batchSize) || this.#streamingConfig.batchSize < 1) {
+      throw new Error('Streaming batch size must be a positive integer');
+    }
+    if (!Number.isInteger(this.#streamingConfig.queueCapacity) || this.#streamingConfig.queueCapacity < this.#streamingConfig.batchSize) {
+      throw new Error('Streaming queue capacity must be at least the batch size');
+    }
+    this.#streamTimer = setInterval(() => {
+      void this.#drainStreaming();
+    }, this.#streamingConfig.flushIntervalMs);
+  }
+
+  async stopStreaming(): Promise<void> {
+    if (this.#streamTimer) clearInterval(this.#streamTimer);
+    this.#streamTimer = undefined;
+    await this.#drainStreaming();
+    this.#flushStreamingQueue();
+  }
+
+  #flushStreamingQueue(): void {
+    if (this.#streamQueue.length === 0) return;
+    this.#streamedRecords.push(...this.#streamQueue.splice(0));
+    this.#streamBatchCount += 1;
+  }
+
+  #enqueueStreamedRecord(record: CollectedTargetRecord): void {
+    if (this.#streamQueue.length >= this.#streamingConfig.queueCapacity) {
+      const coalescible = record.record.type === 'pointerover' || record.record.type === 'pointerout' || record.record.type === 'scroll';
+      if (coalescible) {
+        const existingIndex = this.#streamQueue.findIndex((candidate) => (
+          candidate.targetId === record.targetId && candidate.record.type === record.record.type
+        ));
+        if (existingIndex >= 0) {
+          this.#streamQueue[existingIndex] = record;
+          this.#streamCoalescedRecords += 1;
+          return;
+        }
+      }
+      this.#streamHostDroppedRecords += 1;
+      this.#streamDroppedByTarget.set(record.targetId, (this.#streamDroppedByTarget.get(record.targetId) ?? 0) + 1);
+      return;
+    }
+    this.#streamQueue.push(record);
+    if (this.#streamQueue.length >= this.#streamingConfig.batchSize) this.#flushStreamingQueue();
+  }
+
+  async #drainStreaming(): Promise<void> {
+    if (this.#streamDrain) return this.#streamDrain;
+    this.#streamDrain = (async () => {
+      for (const registered of this.#currentFrames.values()) {
+        if (registered.frame.isDetached()) continue;
+        try {
+          const observer = await drainPageObserver(registered.frame);
+          for (const raw of observer.records) this.#enqueueStreamedRecord({ targetId: registered.targetId, record: {
+            ...raw,
+            id: `${registered.targetId}:${raw.id}`,
+            ...(raw.targetRef ? { targetRef: raw.targetRef.replace('nav-1:main', registered.targetId) } : {}),
+          } });
+        } catch {
+          // Final checkpoint records the collector failure and coverage gap.
+        }
+      }
+      for (const registered of this.#currentWorkers.values()) {
+        await registered.installation;
+        try {
+          const observer = await registered.worker.evaluate(() => {
+            const state = (globalThis as unknown as { __WBC_WORKER_OBSERVER__: WorkerObserverState }).__WBC_WORKER_OBSERVER__;
+            const records = state.records.splice(0, state.records.length);
+            return { ...state, records, timeOrigin: performance.timeOrigin, now: performance.now() };
+          });
+          for (const raw of observer.records) this.#enqueueStreamedRecord({
+            targetId: registered.targetId,
+            record: { ...raw, id: `${registered.targetId}:${raw.id}`, source: 'page' },
+          });
+        } catch {
+          // Worker lifecycle errors are represented by target coverage.
+        }
+      }
+    })().finally(() => { this.#streamDrain = undefined; });
+    return this.#streamDrain;
   }
 
   #createFrameEntry(frame: Frame, logicalId: string, epoch: number, parentTargetId: string | null): RegisteredFrame {
@@ -432,7 +542,7 @@ export class TargetRegistry {
     await this.checkpoint();
 
     const coverage: TargetCoverage[] = [];
-    const records: CollectedTargetRecord[] = [];
+    const records: CollectedTargetRecord[] = [...this.#streamedRecords, ...this.#streamQueue];
     const elements: ElementRef[] = [];
     const mainUrl = this.#frameHistory.find((entry) => entry.logicalId === 'main' && entry.lifecycleStatus === 'active')?.url
       ?? this.#page.mainFrame().url();
@@ -466,7 +576,8 @@ export class TargetRegistry {
           });
         }
       }
-      const droppedRecords = observer?.droppedRecords ?? 0;
+      const streamedCount = records.filter((candidate) => candidate.targetId === registered.targetId).length;
+      const droppedRecords = (observer?.droppedRecords ?? 0) + (this.#streamDroppedByTarget.get(registered.targetId) ?? 0);
       const failed = !observer;
       const archived = registered.lifecycleStatus !== 'active';
       const gaps = [
@@ -488,7 +599,7 @@ export class TargetRegistry {
         coverageStart: 'document_start',
         collector: {
           status: failed ? 'failed' : 'installed',
-          recordCount: observer?.records.length ?? 0,
+          recordCount: streamedCount + (observer?.records.length ?? 0),
           droppedRecords,
           knownLoss: droppedRecords > 0,
         },
@@ -508,7 +619,7 @@ export class TargetRegistry {
           });
         }
       }
-      const droppedRecords = observer?.droppedRecords ?? 0;
+      const droppedRecords = (observer?.droppedRecords ?? 0) + (this.#streamDroppedByTarget.get(registered.targetId) ?? 0);
       const failed = !observer;
       const gaps = [
         'worker_start_to_collector_install',
@@ -530,7 +641,7 @@ export class TargetRegistry {
         coverageStart: 'runtime',
         collector: {
           status: failed ? 'failed' : 'installed',
-          recordCount: observer?.records.length ?? 0,
+          recordCount: records.filter((candidate) => candidate.targetId === registered.targetId).length + (observer?.records.length ?? 0),
           droppedRecords,
           knownLoss: droppedRecords > 0,
         },
@@ -540,6 +651,20 @@ export class TargetRegistry {
       });
     }
 
-    return { coverage, records, elements };
+    return {
+      coverage,
+      records,
+      elements,
+      streaming: {
+        mode: 'host_batch',
+        flushIntervalMs: this.#streamingConfig.flushIntervalMs,
+        batchSize: this.#streamingConfig.batchSize,
+        queueCapacity: this.#streamingConfig.queueCapacity,
+        coalescedRecordTypes: ['pointerover', 'pointerout', 'scroll'],
+        batchCount: this.#streamBatchCount,
+        coalescedRecords: this.#streamCoalescedRecords,
+        hostDroppedRecords: this.#streamHostDroppedRecords,
+      },
+    };
   }
 }

@@ -159,7 +159,10 @@
                 "flushIntervalMs": { "type": "number", "minimum": 0 },
                 "batchSize": { "type": "integer", "minimum": 1 },
                 "queueCapacity": { "type": "integer", "minimum": 1 },
-                "coalescedRecordTypes": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+                "coalescedRecordTypes": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+                "batchCount": { "type": "integer", "minimum": 0 },
+                "coalescedRecords": { "type": "integer", "minimum": 0 },
+                "hostDroppedRecords": { "type": "integer", "minimum": 0 }
               }
             }
           }

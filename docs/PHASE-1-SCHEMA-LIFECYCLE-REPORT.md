@@ -10,4 +10,4 @@
 
 ## Explicit limitation
 
-Recorder saat ini masih mengakumulasi evidence di host memory dan menulis batch pada finalisasi. Metadata `streaming.mode` karena itu `buffered`, bukan klaim host-streaming. Bounded queue dan coalescing pointer/scroll 50 ms/128 record/10.000 record masih menjadi gate implementasi berikutnya.
+Recorder melakukan host-streaming drain setiap 50 ms atau 128 record dengan bounded queue 10.000 record. Pointer/scroll dapat dicoalesce saat backpressure; event critical tidak dicoalesce dan host drop masuk ke loss accounting.

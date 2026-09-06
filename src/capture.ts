@@ -554,6 +554,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
   const browser = await chromium.launch({ headless: true, args: ['--site-per-process'] });
   const redactor = new Redactor();
   const recorder = new EvidenceRecorder(redactor);
+  let targetRegistry: TargetRegistry | undefined;
   try {
     throwIfCancelled();
     const overhead = await benchmarkObserver(browser, server.url, options.overheadRuns ?? 3);
@@ -566,7 +567,8 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     });
     await installPageObserver(context, options.maxPageRecords ?? 10_000);
     const page = await context.newPage();
-    const targetRegistry = new TargetRegistry(page, options.maxPageRecords ?? 10_000);
+    targetRegistry = new TargetRegistry(page, options.maxPageRecords ?? 10_000);
+    targetRegistry.startStreaming({ flushIntervalMs: 50, batchSize: 128, queueCapacity: 10_000 });
     const cdp: CDPSession = await context.newCDPSession(page);
     let cdpAnimationSupported = true;
     try {
@@ -616,6 +618,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     await lifecycleDetach;
     recorder.record('input', 'target-lifecycle-detach-requested', { from: '/lifecycle-b/' });
 
+    await targetRegistry.stopStreaming();
     const targets = await targetRegistry.collect();
     for (const { targetId, record } of targets.records) recorder.ingest(record, targetId);
     const targetCoverage = redactor.redact(targets.coverage);
@@ -699,11 +702,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
             sampleCount: overhead.sampleCount,
           },
           streaming: {
-            mode: 'buffered',
-            flushIntervalMs: 50,
-            batchSize: 128,
-            queueCapacity: options.maxPageRecords ?? 10_000,
-            coalescedRecordTypes: [],
+            ...targets.streaming,
           },
         },
         visualRedaction: {
@@ -727,7 +726,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           'Locator candidates exclude visible text; ordinal identity for fully ambiguous elements may drift after DOM reordering.',
           'Independent structural resolution is heuristic; major layout reordering or many visually identical candidates can be rejected as ambiguous.',
           'No MCP server is included; the local viewer is read-only and does not yet render the visual evidence gallery.',
-          'Host-streaming batches are declared as buffered until the bounded 50 ms/128-record writer is implemented.',
+          'Host-streaming preserves critical records and only coalesces pointer/scroll under backpressure; any host drop is explicit in quality metrics.',
           'Visual redaction summary is explicit but selector masking is not yet enabled for screenshots.',
         ],
       },
@@ -759,6 +758,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     else setState('failed');
     throw error;
   } finally {
+    if (targetRegistry) await targetRegistry.stopStreaming().catch(() => undefined);
     if (!promoted) await rm(stagingDirectory, { recursive: true, force: true });
     await browser.close();
     await server.close();

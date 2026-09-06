@@ -13,8 +13,8 @@ Schema contract dinaikkan ke `1.6.0` secara additive. Validator menerima `1.5.0`
 
 API capture menerima `AbortSignal` dan callback state. State yang dilaporkan adalah `running`, `stopping`, `finalizing`, `completed`, `cancelled`, atau `failed`. Cancellation sebelum promotion menghapus staging dan melempar `CaptureCancelledError`; package tidak dipromosikan.
 
-Mode streaming saat ini dinyatakan `buffered` dengan parameter target 50 ms/128 record/10.000 queue. Nilai ini sengaja tidak dilaporkan sebagai `host_batch` sebelum writer streaming benar-benar tersedia.
+Recorder memakai host-streaming batch dengan flush 50 ms atau 128 record dan bounded queue 10.000 record. Saat queue penuh, pointer/scroll dapat digabungkan; event critical tidak pernah digabungkan dan host drop dicatat sebagai known loss.
 
 ## Consequence
 
-Reopen terhadap artifact 1.5 tetap bekerja, sementara agent dapat membedakan package completed dari cancellation/failure tanpa membaca raw log. Host streaming dan resume revision penuh tetap menjadi pekerjaan lanjutan; resume tidak memalsukan kontinuitas browser realm lama.
+Reopen terhadap artifact 1.5 tetap bekerja, sementara agent dapat membedakan package completed dari cancellation/failure tanpa membaca raw log. Resume revision penuh tetap menjadi pekerjaan lanjutan; resume tidak memalsukan kontinuitas browser realm lama.

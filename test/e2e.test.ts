@@ -21,7 +21,9 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
     assert.equal(contract.schemaVersion, '1.6.0');
     assert.equal(contract.manifest.schemaVersion, '1.6.0');
     assert.equal(contract.manifest.status, 'completed');
-    assert.equal(contract.manifest.quality.streaming?.mode, 'buffered');
+    assert.equal(contract.manifest.quality.streaming?.mode, 'host_batch');
+    assert.equal(contract.manifest.quality.streaming?.flushIntervalMs, 50);
+    assert.equal(contract.manifest.quality.streaming?.batchSize, 128);
     assert.equal(contract.manifest.redaction.policyVersion, '1.0.0');
     assert.ok(contract.manifest.redaction.redactedValues > 0);
     assert.ok(contract.manifest.redaction.categories.includes('token'));

@@ -111,6 +111,19 @@ export async function readPageObserver(realm: Page | Frame): Promise<PageObserve
   });
 }
 
+export async function drainPageObserver(realm: Page | Frame): Promise<PageObserverState> {
+  return realm.evaluate(() => {
+    const state = (window as unknown as { __WBC_OBSERVER__: Omit<PageObserverState, 'timeOrigin' | 'now'> }).__WBC_OBSERVER__;
+    const records = state.records.splice(0, state.records.length);
+    return {
+      ...state,
+      records,
+      timeOrigin: performance.timeOrigin,
+      now: performance.now(),
+    };
+  });
+}
+
 export async function measureFrameIntervals(page: Page, count = 90): Promise<number[]> {
   return page.evaluate(async (sampleCount) => {
     const intervals: number[] = [];
