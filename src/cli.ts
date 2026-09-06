@@ -120,7 +120,15 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error('Usage: tsx src/cli.ts <capture|verify|probe|inspect|query|evidence|review> [--out PATH] [--contract PATH] [--package PATH] [--port N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
+  if (command === 'benchmark') {
+    const { benchmarkSessionPackage } = await import('./benchmark.js');
+    const packageDirectory = resolve(option('--package') ?? 'artifacts/phase1/latest');
+    const iterations = option('--iterations');
+    console.log(JSON.stringify(await benchmarkSessionPackage(packageDirectory, iterations ? Number(iterations) : 3), null, 2));
+    return;
+  }
+
+  console.error('Usage: tsx src/cli.ts <capture|verify|probe|inspect|query|evidence|review|benchmark> [--out PATH] [--contract PATH] [--package PATH] [--port N] [--iterations N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
   process.exitCode = 2;
 }
 

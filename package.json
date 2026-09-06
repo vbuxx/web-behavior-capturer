@@ -11,6 +11,7 @@
     "query": "tsx src/cli.ts query",
     "evidence": "tsx src/cli.ts evidence",
     "review": "tsx src/cli.ts review",
+    "benchmark": "tsx src/cli.ts benchmark",
     "verify": "tsx src/cli.ts verify",
     "verify:replica": "tsx src/cli.ts verify --target replica",
     "probe": "tsx src/cli.ts probe",
