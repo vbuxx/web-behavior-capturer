@@ -36,6 +36,7 @@ pnpm run benchmark -- --package artifacts/phase1/latest --iterations 3
 pnpm run benchmark:synthetic -- --package artifacts/phase1/latest --records 50000 --evidence-mb 100 --iterations 3
 pnpm run benchmark:browser -- --iterations 2
 pnpm run benchmark:capture -- --overhead-runs 1
+pnpm run evaluate -- --package artifacts/phase1/latest --repetitions 3 --out .wbc/evaluation/phase2-report.json
 pnpm run benchmark:reliability -- --parallel 2 --cycles 1
 pnpm run benchmark:crash -- --kill-after-ms 15000
 pnpm run cleanup:staging -- --out .wbc/phase1 --max-age-ms 86400000
@@ -149,6 +150,9 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/PHASE-2-SERVICE-REPORT.md` berisi operasi service, integrity snapshot, dan batas local job store.
 - `docs/decisions/0031-loopback-viewer-auth-and-annotations.md` menetapkan auth cookie lokal dan annotation sidecar append-only.
 - `docs/PHASE-2-VIEWER-REPORT.md` berisi graph/provenance viewer dan batas mismatch rendering.
+- `fixtures/evaluation/fixture-matrix.json` dan `src/evaluation.ts` menyediakan 12-fixture matrix serta evaluasi tiga pengulangan tanpa mengarang agent score.
+- `docs/PHASE-2-EVALUATION-REPORT.md` berisi cara menjalankan evaluasi dan batas baseline A/B/C.
+- `docs/decisions/0032-phase-2-evaluation-boundary.md` menetapkan pemisahan verifier, agent success, overhead, loss, dan unsupported coverage.
 - `src/staging.ts` menyediakan janitor age-bounded untuk orphan staging directory setelah hard crash.
 
 ## Batas interpretasi

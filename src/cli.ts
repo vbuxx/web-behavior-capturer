@@ -208,6 +208,14 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === 'evaluate') {
+    const { evaluatePhase2 } = await import('./evaluation.js');
+    const packageDirectory = resolve(option('--package') ?? 'artifacts/phase1/latest');
+    const report = resolve(option('--out') ?? '.wbc/evaluation/phase2-report.json');
+    console.log(JSON.stringify(await evaluatePhase2(packageDirectory, report, Number(option('--repetitions') ?? 3)), null, 2));
+    return;
+  }
+
   if (command === 'browser-benchmark') {
     const { benchmarkSyntheticBrowser } = await import('./browser-benchmark.js');
     console.log(JSON.stringify(await benchmarkSyntheticBrowser(Number(option('--iterations') ?? 2)), null, 2));
@@ -287,7 +295,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error('Usage: tsx src/cli.ts <capture|capture-start|capture-status|capture-stop|capture-export|verify|replica-verify|probe|probe-run|inspect|query|evidence|behavior-list|behavior-get|evidence-get|review|benchmark|browser-benchmark|capture-benchmark|reliability-benchmark|crash-benchmark|cleanup-staging|failure-benchmark|corruption-benchmark|rotate-package|rotation-recover|quota-benchmark|prune-archives|cleanup-rotation> [--out PATH] [--source PATH] [--destination PATH] [--package PATH] [--archive-dir PATH] [--job ID] [--behavior ID] [--keep N] [--apply] [--quota-blocks N] [--copy-fallback] [--visual-policy PATH] [--port N] [--parallel N] [--cycles N] [--kill-after-ms N] [--max-age-ms N] [--iterations N] [--synthetic] [--records N] [--evidence-mb N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
+  console.error('Usage: tsx src/cli.ts <capture|capture-start|capture-status|capture-stop|capture-export|verify|replica-verify|probe|probe-run|inspect|query|evidence|behavior-list|behavior-get|evidence-get|review|benchmark|evaluate|browser-benchmark|capture-benchmark|reliability-benchmark|crash-benchmark|cleanup-staging|failure-benchmark|corruption-benchmark|rotate-package|rotation-recover|quota-benchmark|prune-archives|cleanup-rotation> [--out PATH] [--source PATH] [--destination PATH] [--package PATH] [--archive-dir PATH] [--job ID] [--behavior ID] [--repetitions N] [--keep N] [--apply] [--quota-blocks N] [--copy-fallback] [--visual-policy PATH] [--port N] [--parallel N] [--cycles N] [--kill-after-ms N] [--max-age-ms N] [--iterations N] [--synthetic] [--records N] [--evidence-mb N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
   process.exitCode = 2;
 }
 

@@ -19,6 +19,7 @@
     "evidence-get": "tsx src/cli.ts evidence-get",
     "review": "tsx src/cli.ts review",
     "benchmark": "tsx src/cli.ts benchmark",
+    "evaluate": "tsx src/cli.ts evaluate",
     "benchmark:synthetic": "tsx src/cli.ts benchmark --synthetic",
     "benchmark:browser": "tsx src/cli.ts browser-benchmark",
     "benchmark:capture": "tsx src/cli.ts capture-benchmark",
