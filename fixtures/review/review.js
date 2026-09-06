@@ -4,6 +4,9 @@ const behaviors = document.querySelector('#behaviors');
 const targets = document.querySelector('#targets');
 const evidence = document.querySelector('#evidence');
 const visuals = document.querySelector('#visuals');
+const graphSummary = document.querySelector('#graph-summary');
+const graphNodes = document.querySelector('#graph-nodes');
+const annotations = document.querySelector('#annotations');
 const error = document.querySelector('#error');
 
 function appendTextCell(row, value) {
@@ -48,6 +51,34 @@ async function loadVisuals() {
   }
 }
 
+async function loadGraph() {
+  try {
+    const graph = await json('/api/graph');
+    const counts = new Map();
+    for (const node of graph.nodes) counts.set(node.kind, (counts.get(node.kind) ?? 0) + 1);
+    graphSummary.textContent = `${graph.revision} · ${graph.edges.length} edges · ${graph.limitations.length} limitations`;
+    graphNodes.replaceChildren();
+    for (const [kind, count] of counts) {
+      const row = document.createElement('tr');
+      appendTextCell(row, kind);
+      appendTextCell(row, count);
+      graphNodes.append(row);
+    }
+  } catch (cause) {
+    graphSummary.textContent = cause instanceof Error && cause.message.includes('graph_not_available') ? 'No evidence graph in this package revision.' : String(cause);
+  }
+}
+
+async function loadAnnotations() {
+  const page = await json('/api/annotations');
+  annotations.replaceChildren();
+  for (const annotation of page.annotations) {
+    const item = document.createElement('p');
+    item.textContent = `${annotation.createdAt} · ${annotation.note}`;
+    annotations.append(item);
+  }
+}
+
 async function load() {
   try {
     const [session, behaviorPage] = await Promise.all([json('/api/session'), json('/api/behaviors?limit=100')]);
@@ -83,11 +114,19 @@ async function load() {
       appendTextCell(row, target.completeness);
       targets.append(row);
     }
-    await Promise.all([loadEvidence(), loadVisuals()]);
+    await Promise.all([loadEvidence(), loadVisuals(), loadGraph(), loadAnnotations()]);
   } catch (cause) {
     error.textContent = cause instanceof Error ? cause.message : String(cause);
   }
 }
 
 document.querySelector('#reload').addEventListener('click', () => void loadEvidence().catch((cause) => { error.textContent = cause.message; }));
+document.querySelector('#annotation-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const note = document.querySelector('#annotation-note').value;
+  fetch('/api/annotations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note }) })
+    .then((response) => response.ok ? response.json() : response.json().then((payload) => Promise.reject(new Error(payload.error))))
+    .then(() => { document.querySelector('#annotation-note').value = ''; return loadAnnotations(); })
+    .catch((cause) => { error.textContent = cause.message; });
+});
 void load();

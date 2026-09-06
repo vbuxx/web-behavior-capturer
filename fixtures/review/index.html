@@ -34,6 +34,16 @@
         <h2 id="visual-title">Visual evidence</h2>
         <div class="gallery" id="visuals"></div>
       </section>
+      <section aria-labelledby="graph-title">
+        <h2 id="graph-title">Evidence graph and provenance</h2>
+        <p id="graph-summary">Loading graph revision…</p>
+        <div class="table-wrap"><table><thead><tr><th>Node kind</th><th>Count</th></tr></thead><tbody id="graph-nodes"></tbody></table></div>
+      </section>
+      <section aria-labelledby="annotation-title">
+        <h2 id="annotation-title">Immutable annotation</h2>
+        <form id="annotation-form"><label for="annotation-note">Review note</label><textarea id="annotation-note" maxlength="2000" required></textarea><button type="submit">Append annotation</button></form>
+        <div id="annotations"></div>
+      </section>
       <p id="error" role="alert"></p>
     </main>
   </body>

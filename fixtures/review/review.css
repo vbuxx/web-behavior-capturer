@@ -18,6 +18,7 @@ section { padding: 36px 0; border-bottom: 1px solid #283140; }
 .gallery figure { margin: 0; overflow: hidden; border: 1px solid #2d3747; border-radius: 12px; background: #111720cc; }
 .gallery img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #090c11; }
 .gallery figcaption { padding: 10px 12px; color: #98a5b8; font-size: .74rem; overflow-wrap: anywhere; }
+textarea { display: block; width: min(100%, 680px); min-height: 100px; margin: 10px 0; border: 1px solid #2d3747; border-radius: 8px; padding: 10px; background: #0d121a; color: #e8edf5; }
 table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 th, td { padding: 13px 16px; text-align: left; border-bottom: 1px solid #252d3a; }
 th { color: #8f9bad; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }

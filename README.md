@@ -147,6 +147,8 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/PHASE-2-EVIDENCE-GRAPH-REPORT.md` berisi hasil graph foundation dan scope boundary.
 - `docs/decisions/0030-session-service-and-stdio-mcp.md` menetapkan shared service/job store dan MCP local-only.
 - `docs/PHASE-2-SERVICE-REPORT.md` berisi operasi service, integrity snapshot, dan batas local job store.
+- `docs/decisions/0031-loopback-viewer-auth-and-annotations.md` menetapkan auth cookie lokal dan annotation sidecar append-only.
+- `docs/PHASE-2-VIEWER-REPORT.md` berisi graph/provenance viewer dan batas mismatch rendering.
 - `src/staging.ts` menyediakan janitor age-bounded untuk orphan staging directory setelah hard crash.
 
 ## Batas interpretasi

@@ -1,11 +1,13 @@
-import { createHash } from 'node:crypto';
-import { createServer, type ServerResponse } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { extname, isAbsolute, resolve, sep } from 'node:path';
 import { reviewRoot } from './paths.js';
 import { inspectSessionPackage, querySessionBehaviors, querySessionRecords, type SessionRecordQuery } from './session-index.js';
 import { validateContract, validateSessionIndexManifest } from './validate.js';
 import type { BehaviorKind, ContractPackage } from './types.js';
+import { validateEvidenceGraph } from './evidence-graph-validate.js';
+import type { EvidenceGraph } from './evidence-graph.js';
 
 const behaviorKinds: BehaviorKind[] = ['hover', 'css_animation', 'interrupted_transition', 'scroll_reveal', 'gsap_scrub'];
 const assets = new Map([
@@ -16,6 +18,7 @@ const assets = new Map([
 
 export interface ReviewServer {
   url: string;
+  authToken: string;
   close(): Promise<void>;
 }
 
@@ -26,6 +29,23 @@ function writeJson(response: ServerResponse, status: number, value: unknown): vo
     'x-content-type-options': 'nosniff',
   });
   response.end(JSON.stringify(value));
+}
+
+function hasSessionCookie(request: IncomingMessage, token: string): boolean {
+  const cookie = request.headers.cookie ?? '';
+  return cookie.split(';').some((part) => part.trim() === `wbc_session=${token}`);
+}
+
+async function readBody(request: IncomingMessage, maxBytes = 32_768): Promise<string> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of request) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += bytes.length;
+    if (total > maxBytes) throw new Error('Request body exceeds limit');
+    chunks.push(bytes);
+  }
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 function optionalNumber(url: URL, key: string): number | undefined {
@@ -55,12 +75,18 @@ async function loadVerifiedContract(packageRoot: string): Promise<ContractPackag
 export async function startReviewServer(packageDirectory: string, port = 0): Promise<ReviewServer> {
   const packageRoot = resolve(packageDirectory);
   await inspectSessionPackage(packageRoot);
+  const authToken = randomBytes(32).toString('base64url');
   if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new Error('Review port must be an integer from 0 to 65535');
 
   const server = createServer((request, response) => {
     void (async () => {
       const url = new URL(request.url ?? '/', 'http://127.0.0.1');
-      if (request.method !== 'GET') {
+      const isApi = url.pathname.startsWith('/api/');
+      if (isApi && !hasSessionCookie(request, authToken)) {
+        writeJson(response, 401, { error: 'session_auth_required' });
+        return;
+      }
+      if (request.method !== 'GET' && url.pathname !== '/api/annotations') {
         writeJson(response, 405, { error: 'method_not_allowed' });
         return;
       }
@@ -106,6 +132,42 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
         writeJson(response, 200, { visuals, count: visuals.length });
         return;
       }
+      if (url.pathname === '/api/graph') {
+        const manifest = await validateSessionIndexManifest(JSON.parse(await readFile(resolve(packageRoot, 'session-index.json'), 'utf8')));
+        if (!manifest.evidenceGraph) {
+          writeJson(response, 404, { error: 'graph_not_available' });
+          return;
+        }
+        const graphPath = resolveInside(packageRoot, manifest.evidenceGraph.path);
+        const graph = await validateEvidenceGraph(JSON.parse(await readFile(graphPath, 'utf8')));
+        writeJson(response, 200, graph);
+        return;
+      }
+      if (url.pathname === '/api/annotations') {
+        const annotationPath = resolve(packageRoot, 'annotations.jsonl');
+        if (request.method === 'GET') {
+          let text = '';
+          try { text = await readFile(annotationPath, 'utf8'); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+          const annotations = text.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+          writeJson(response, 200, { annotations, count: annotations.length });
+          return;
+        }
+        const body = JSON.parse(await readBody(request)) as Record<string, unknown>;
+        if (typeof body.note !== 'string' || body.note.trim().length === 0 || body.note.length > 2_000) throw new Error('Annotation note must be 1-2000 characters');
+        const manifest = await validateSessionIndexManifest(JSON.parse(await readFile(resolve(packageRoot, 'session-index.json'), 'utf8')));
+        const annotation = {
+          annotationId: randomUUID(),
+          createdAt: new Date().toISOString(),
+          baseRevision: manifest.evidenceGraph ? manifest.evidenceGraph.sha256 : manifest.contract.sha256,
+          note: body.note,
+          ...(typeof body.targetRef === 'string' ? { targetRef: body.targetRef } : {}),
+          ...(Array.isArray(body.evidenceRefs) ? { evidenceRefs: body.evidenceRefs.filter((ref): ref is string => typeof ref === 'string').slice(0, 50) } : {}),
+        };
+        await mkdir(packageRoot, { recursive: true });
+        await appendFile(annotationPath, `${JSON.stringify(annotation)}\n`, 'utf8');
+        writeJson(response, 201, annotation);
+        return;
+      }
       if (url.pathname.startsWith('/api/visual/')) {
         const evidenceId = decodeURIComponent(url.pathname.slice('/api/visual/'.length));
         const contract = await loadVerifiedContract(packageRoot);
@@ -144,6 +206,7 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
         'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
         'x-content-type-options': 'nosniff',
         'x-frame-options': 'DENY',
+        ...(url.pathname === '/' ? { 'set-cookie': `wbc_session=${authToken}; HttpOnly; SameSite=Strict; Path=/` } : {}),
       });
       response.end(await readFile(resolve(reviewRoot, asset)));
     })().catch((error) => writeJson(response, 400, { error: error instanceof Error ? error.message : 'request_failed' }));
@@ -157,6 +220,7 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
   if (!address || typeof address === 'string') throw new Error('Review server did not expose a TCP port');
   return {
     url: `http://127.0.0.1:${address.port}`,
+    authToken,
     close: () => new Promise<void>((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose())),
   };
 }
