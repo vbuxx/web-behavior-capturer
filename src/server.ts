@@ -1,7 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
-import { fixtureRoot, probesRoot, replicaRoot, repoRoot } from './paths.js';
+import { fixtureRoot, loadFixtureRoot, probesRoot, replicaRoot, repoRoot } from './paths.js';
 
 const routes: Record<string, string> = {
   '/': resolve(fixtureRoot, 'index.html'),
@@ -24,6 +24,9 @@ const routes: Record<string, string> = {
   '/lifecycle-b/': resolve(probesRoot, 'lifecycle-b.html'),
   '/race-start/': resolve(probesRoot, 'race-start.html'),
   '/race-end/': resolve(probesRoot, 'race-end.html'),
+  '/load/': resolve(loadFixtureRoot, 'index.html'),
+  '/load.js': resolve(loadFixtureRoot, 'load.js'),
+  '/load.css': resolve(loadFixtureRoot, 'load.css'),
 };
 
 const contentTypes: Record<string, string> = {

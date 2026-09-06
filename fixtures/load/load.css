@@ -1,0 +1,7 @@
+:root { font-family: system-ui, sans-serif; background: #111827; color: #e5e7eb; }
+body { margin: 0; }
+#load-root { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 900px; }
+#nodes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.node { min-height: 44px; padding: 8px; border: 1px solid #334155; border-radius: 6px; background: #1e293b; }
+.track { animation: synthetic-drift 900ms ease-in-out infinite alternate; will-change: transform, opacity; }
+@keyframes synthetic-drift { from { transform: translateX(0); opacity: .72; } to { transform: translateX(10px); opacity: 1; } }
