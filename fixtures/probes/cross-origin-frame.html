@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 12px; }
+      [data-wbc-id='oopif-target'] { display: inline-block; animation: frame-motion 180ms ease-out both; }
+      @keyframes frame-motion { from { opacity: .4; transform: translateX(0); } to { opacity: 1; transform: translateX(24px); } }
+    </style>
+  </head>
+  <body data-cross-frame-ready="true">
+    <div data-wbc-id="oopif-target">Cross-origin frame target</div>
+    <script>
+      addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => { document.body.classList.add('observer-signal'); }, 25);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-09-06T03:19:21.425Z",
+  "database": {
+    "path": "session.sqlite",
+    "sha256": "243507648fa54438586ab3874a057450d2ddc7a83bb4f26676ad2143720fed66"
+  },
+  "contract": {
+    "path": "behavior-contract.json",
+    "sha256": "21c96e9cf4f7b050aba891a9274a0772e8cdee40017a95771594e3c4facc1498"
+  },
+  "counts": {
+    "targets": 7,
+    "behaviors": 5,
+    "evidence": 300,
+    "records": 285
+  }
+}

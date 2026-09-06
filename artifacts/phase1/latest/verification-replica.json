@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0.0",
+  "verifiedAt": "2026-09-06T03:19:48.033Z",
+  "referenceSessionId": "bee7b1dd-d2ae-4073-a24b-3e329c189a4a",
+  "scenarioSuiteId": "phase0-held-out-v1",
+  "targetLabel": "replica",
+  "targetUrl": "http://127.0.0.1:59776/replica/",
+  "heldOutConditions": [
+    "Viewport 1100x740",
+    "Scenario parameters loaded from versioned JSON",
+    "Elements resolved by stable data identity, not source selectors",
+    "Independent markup and no GSAP runtime"
+  ],
+  "checks": [
+    {
+      "scenarioId": "hover-complete",
+      "behaviorId": "hover-card-enter",
+      "status": "passed",
+      "scenario": "Complete hover entry resolved through stable element identity.",
+      "metrics": {
+        "expectedYDelta": -12,
+        "observedYDelta": -12,
+        "opacityDelta": 0.28
+      },
+      "mismatches": []
+    },
+    {
+      "scenarioId": "css-animation-lifecycle",
+      "behaviorId": "css-keyframe-pulse",
+      "status": "passed",
+      "scenario": "Trigger target and animation target resolved independently from the contract.",
+      "metrics": {
+        "activeAnimations": 1,
+        "expectedDurationMs": 600,
+        "observedDurationMs": 600
+      },
+      "mismatches": []
+    },
+    {
+      "scenarioId": "interrupt-quarter-duration",
+      "behaviorId": "interrupted-card-hover",
+      "status": "passed",
+      "scenario": "Exit at 25% duration, then recover to idle.",
+      "metrics": {
+        "heldOutExitMs": 105,
+        "changedBeforeExit": true,
+        "interruptionTranslationX": 29.498,
+        "idleTranslationX": 0,
+        "recoveredTranslationX": 0,
+        "idleOpacity": 0.58,
+        "recoveredOpacity": 0.58
+      },
+      "mismatches": []
+    },
+    {
+      "scenarioId": "scroll-reveal-reverse",
+      "behaviorId": "scroll-threshold-reveal",
+      "status": "passed",
+      "scenario": "Observe a visual threshold crossing, then reverse until the target returns to idle.",
+      "metrics": {
+        "resolvedOnsetScrollY": 1121.5,
+        "revealed": true,
+        "hiddenAfterReverse": true,
+        "reverseOpacity": 0
+      },
+      "mismatches": []
+    },
+    {
+      "scenarioId": "scrub-held-out-reverse",
+      "behaviorId": "gsap-scrolltrigger-scrub",
+      "status": "passed",
+      "scenario": "Resolve motion boundaries from computed output, sample 0.2, 0.8, 0.4, and verify reverse.",
+      "metrics": {
+        "maxProgressError": 0,
+        "reverseMonotonic": true,
+        "observedStartPx": 1625.508,
+        "observedEndPx": 2124.531,
+        "expectedTravelPx": 420
+      },
+      "mismatches": []
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5
+  }
+}

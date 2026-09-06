@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wbc.local/schema/behavior-contract-1.2.0.json",
+  "title": "Website Behavior Capture Contract Package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "manifest", "elements", "behaviors", "evidenceIndex"],
+  "properties": {
+    "schemaVersion": { "const": "1.2.0" },
+    "manifest": { "$ref": "#/$defs/manifest" },
+    "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } },
+    "behaviors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/behavior" }
+    },
+    "evidenceIndex": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "mediaType", "sha256"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "mediaType": { "enum": ["application/x-ndjson", "image/png"] },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "measurementMs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit"],
+      "properties": {
+        "value": { "type": "number", "minimum": 0 },
+        "unit": { "const": "ms" }
+      }
+    },
+    "measurementPx": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit"],
+      "properties": {
+        "value": { "type": "number" },
+        "unit": { "const": "px" }
+      }
+    },
+    "measurementEpochMs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit"],
+      "properties": {
+        "value": { "type": "number", "minimum": 0 },
+        "unit": { "const": "epoch_ms" }
+      }
+    },
+    "targetCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetId", "navigationId", "epoch", "parentTargetId", "kind", "url", "attachedAt", "lifecycleStatus", "coverageStart", "collector", "completeness", "gaps"],
+      "properties": {
+        "targetId": { "type": "string", "minLength": 1 },
+        "navigationId": { "type": "string", "minLength": 1 },
+        "epoch": { "type": "integer", "minimum": 1 },
+        "parentTargetId": { "type": ["string", "null"] },
+        "kind": { "enum": ["main_frame", "same_origin_iframe", "cross_origin_iframe", "dedicated_worker"] },
+        "url": { "type": "string" },
+        "attachedAt": { "$ref": "#/$defs/measurementEpochMs" },
+        "detachedAt": { "$ref": "#/$defs/measurementEpochMs" },
+        "coverageEnd": { "$ref": "#/$defs/measurementEpochMs" },
+        "lifecycleStatus": { "enum": ["active", "navigated", "detached"] },
+        "coverageStart": { "enum": ["document_start", "runtime"] },
+        "collector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "recordCount", "droppedRecords", "knownLoss"],
+          "properties": {
+            "status": { "enum": ["installed", "failed"] },
+            "recordCount": { "type": "integer", "minimum": 0 },
+            "droppedRecords": { "type": "integer", "minimum": 0 },
+            "knownLoss": { "type": "boolean" }
+          }
+        },
+        "clockMapping": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceTimeOrigin", "observedAt", "mappedEpoch", "hostReceiveTime", "estimatedError"],
+          "properties": {
+            "sourceTimeOrigin": { "$ref": "#/$defs/measurementEpochMs" },
+            "observedAt": { "$ref": "#/$defs/measurementMs" },
+            "mappedEpoch": { "$ref": "#/$defs/measurementEpochMs" },
+            "hostReceiveTime": { "$ref": "#/$defs/measurementEpochMs" },
+            "estimatedError": { "$ref": "#/$defs/measurementMs" }
+          }
+        },
+        "completeness": { "enum": ["full", "partial"] },
+        "gaps": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["productVersion", "schemaVersion", "sessionId", "navigationId", "generatedAt", "source", "environment", "captureMode", "capabilities", "targetCoverage", "quality", "gaps"],
+      "properties": {
+        "productVersion": { "type": "string" },
+        "schemaVersion": { "const": "1.2.0" },
+        "sessionId": { "type": "string" },
+        "navigationId": { "type": "string" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "source": { "type": "object" },
+        "environment": { "type": "object" },
+        "captureMode": { "const": "natural" },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "status"],
+            "properties": {
+              "name": { "type": "string" },
+              "status": { "enum": ["supported", "unavailable", "failed", "not_attempted"] },
+              "detail": { "type": "string" }
+            }
+          }
+        },
+        "targetCoverage": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/targetCoverage" }
+        },
+        "quality": { "type": "object" },
+        "gaps": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "element": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "navigationId", "frame", "selector", "dataWbcId", "bounds"],
+      "properties": {
+        "id": { "type": "string" },
+        "navigationId": { "type": "string" },
+        "frame": { "const": "main" },
+        "selector": { "type": "string" },
+        "dataWbcId": { "type": "string" },
+        "bounds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "width", "height"],
+          "properties": {
+            "x": { "type": "number" }, "y": { "type": "number" },
+            "width": { "type": "number", "minimum": 0 }, "height": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "sample": {
+      "type": "object",
+      "required": ["opacity", "transform", "x", "y"],
+      "properties": {
+        "progress": { "type": "number" },
+        "elapsedMs": { "type": "number" },
+        "scrollY": { "type": "number" },
+        "opacity": { "type": "number" },
+        "transform": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "timeTimeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "duration", "delay", "easing", "iterations"],
+      "properties": {
+        "domain": { "const": "time" },
+        "duration": { "$ref": "#/$defs/measurementMs" },
+        "delay": { "$ref": "#/$defs/measurementMs" },
+        "easing": { "type": "string" },
+        "iterations": { "oneOf": [{ "type": "number", "minimum": 0 }, { "const": "infinite" }] }
+      }
+    },
+    "scrollTimeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "containerRef", "axis", "range", "scrub"],
+      "properties": {
+        "domain": { "const": "scroll" },
+        "containerRef": { "const": "viewport" },
+        "axis": { "const": "y" },
+        "range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": { "$ref": "#/$defs/measurementPx" },
+            "end": { "$ref": "#/$defs/measurementPx" }
+          }
+        },
+        "scrub": {
+          "type": "object",
+          "required": ["mode"],
+          "properties": {
+            "mode": { "enum": ["direct", "numeric"] },
+            "catchUp": { "$ref": "#/$defs/measurementMs" }
+          }
+        }
+      }
+    },
+    "behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["behaviorId", "kind", "targetRef", "trigger", "timeline", "tracks", "provenance", "visualEvidenceRefs", "unknowns"],
+      "properties": {
+        "behaviorId": { "type": "string" },
+        "kind": { "enum": ["hover", "css_animation", "interrupted_transition", "scroll_reveal", "gsap_scrub"] },
+        "targetRef": { "type": "string" },
+        "trigger": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "targetRef", "edgeClass", "evidenceRefs"],
+          "properties": {
+            "type": { "type": "string" },
+            "targetRef": { "type": "string", "minLength": 1 },
+            "edgeClass": { "enum": ["direct", "experiment_supported", "correlated", "unknown"] },
+            "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          }
+        },
+        "timeline": { "oneOf": [{ "$ref": "#/$defs/timeTimeline" }, { "$ref": "#/$defs/scrollTimeline" }] },
+        "tracks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["property", "from", "to", "keyframes", "samples"],
+            "properties": {
+              "property": { "type": "string" },
+              "from": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
+              "to": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
+              "keyframes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["offset", "easing", "value"],
+                  "properties": {
+                    "offset": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+                    "easing": { "type": "string" },
+                    "value": { "anyOf": [{ "type": "string" }, { "type": "number" }] }
+                  }
+                }
+              },
+              "samples": { "type": "array", "items": { "$ref": "#/$defs/sample" } }
+            }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "evidenceRefs"],
+          "properties": {
+            "status": { "enum": ["extracted", "observed", "inferred", "unknown"] },
+            "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          }
+        },
+        "interruption": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["at", "observedState", "recoveryDuration", "phases", "evidenceRefs"],
+          "properties": {
+            "at": { "$ref": "#/$defs/measurementMs" },
+            "observedState": { "$ref": "#/$defs/sample" },
+            "recoveryDuration": { "$ref": "#/$defs/measurementMs" },
+            "phases": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "status", "tracks"],
+                "properties": {
+                  "name": { "enum": ["entry", "recovery"] },
+                  "status": { "enum": ["interrupted", "completed"] },
+                  "tracks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["property", "from", "to"],
+                      "properties": {
+                        "property": { "type": "string" },
+                        "from": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
+                        "to": { "anyOf": [{ "type": "string" }, { "type": "number" }] }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          }
+        },
+        "visualEvidenceRefs": { "type": "array", "items": { "type": "string" } },
+        "unknowns": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

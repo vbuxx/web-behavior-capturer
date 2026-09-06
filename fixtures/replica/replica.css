@@ -1,0 +1,31 @@
+:root {
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #2f2737;
+  background: #f8f2eb;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: auto; }
+body { margin: 0; }
+.stage { width: min(820px, calc(100% - 56px)); margin: 0 auto; }
+.intro { padding: 72px 0 40px; }
+.intro h1 { margin: 8px 0; font-size: 3.5rem; }
+.intro small { letter-spacing: .12em; text-transform: uppercase; }
+.demo-row { display: grid; grid-template-columns: 1fr 320px; gap: 40px; align-items: center; min-height: 220px; border-top: 1px solid #d9c9bb; }
+.copy h2 { margin: 0 0 8px; }
+.copy p { margin: 0; color: #786a7d; }
+.tile { width: 280px; min-height: 92px; padding: 22px; border: 0; border-radius: 6px; background: #e9f0f8; color: #17304b; font: inherit; text-align: left; }
+.hover-equivalent { display: grid; gap: 7px; opacity: .72; transform: translateY(0); transition: transform 240ms cubic-bezier(.2, .8, .2, 1), opacity 240ms cubic-bezier(.2, .8, .2, 1); }
+.hover-equivalent:hover { opacity: 1; transform: translateY(-12px); }
+.controls { display: grid; gap: 18px; justify-items: start; }
+.run { border: 1px solid #7b526b; border-radius: 4px; padding: 10px 16px; background: white; color: #613d55; font: inherit; }
+.animation-equivalent { transform: translateX(0) scale(1); }
+.interrupt-equivalent { opacity: .58; transform: translateX(0) scale(1); transition: transform 420ms cubic-bezier(.4, 0, .2, 1), opacity 420ms linear; }
+.interrupt-equivalent:hover { opacity: 1; transform: translateX(96px) scale(1.06); }
+.gap.tall { height: 680px; }
+.gap.short { height: 330px; }
+.reveal-equivalent { opacity: 0; transform: translateY(64px); transition: opacity 360ms ease-out, transform 360ms ease-out; }
+.reveal-equivalent[data-visible='true'] { opacity: 1; transform: translateY(0); }
+.rail { position: relative; height: 180px; overflow: hidden; background: #eee2d8; border-radius: 6px; }
+.scrub-equivalent { position: absolute; left: 20px; top: 54px; width: 160px; padding: 20px; border-radius: 4px; background: #6c4960; color: white; font-family: ui-sans-serif, system-ui, sans-serif; transform: translate3d(0, 0, 0) rotate(0deg); }
+.tail { height: 900px; }

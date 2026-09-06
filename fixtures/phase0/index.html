@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WBC Phase 0 Fixture</title>
+    <link rel="stylesheet" href="/fixture.css" />
+    <script src="/vendor/gsap.min.js"></script>
+    <script src="/vendor/ScrollTrigger.min.js"></script>
+    <script src="/fixture.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <p class="eyebrow">Website Behavior Capture</p>
+      <h1>Phase 0 deterministic fixture</h1>
+      <p>Five observable behaviors on one local route.</p>
+    </header>
+
+    <main>
+      <section aria-labelledby="hover-title">
+        <h2 id="hover-title">Hover</h2>
+        <article id="hover-card" data-wbc-id="hover-card" tabindex="0">
+          <strong>Hover target</strong>
+          <span>Completes a transform and opacity transition.</span>
+        </article>
+      </section>
+
+      <section aria-labelledby="animation-title">
+        <h2 id="animation-title">CSS animation</h2>
+        <button id="animation-trigger" data-wbc-id="animation-trigger" type="button">Run CSS keyframes</button>
+        <div id="css-animation" data-wbc-id="css-animation">Keyframe target</div>
+      </section>
+
+      <section aria-labelledby="interrupt-title">
+        <h2 id="interrupt-title">Interrupted transition</h2>
+        <article id="interrupt-card" data-wbc-id="interrupt-card">
+          Enter, then leave before the transition completes.
+        </article>
+      </section>
+
+      <div class="spacer" aria-hidden="true"></div>
+
+      <section id="reveal-section" aria-labelledby="reveal-title">
+        <h2 id="reveal-title">Scroll reveal</h2>
+        <div id="scroll-reveal" data-wbc-id="scroll-reveal">Threshold reveal target</div>
+      </section>
+
+      <div class="spacer small" aria-hidden="true"></div>
+
+      <section id="scrub-section" aria-labelledby="scrub-title">
+        <h2 id="scrub-title">GSAP scrub</h2>
+        <div class="scrub-track">
+          <div id="gsap-scrub" data-wbc-id="gsap-scrub">Scroll-linked target</div>
+        </div>
+      </section>
+
+      <div class="footer-space" aria-hidden="true"></div>
+    </main>
+
+    <div class="target-lab" aria-hidden="true">
+      <iframe title="WBC same-origin capture target" src="/probe-frame/" tabindex="-1"></iframe>
+      <iframe title="WBC cross-origin capture target" data-capture-cross-origin-frame tabindex="-1"></iframe>
+      <iframe title="WBC lifecycle capture target" data-capture-lifecycle-frame src="/lifecycle-a/" tabindex="-1"></iframe>
+      <output data-capture-worker-status>waiting</output>
+    </div>
+  </body>
+</html>

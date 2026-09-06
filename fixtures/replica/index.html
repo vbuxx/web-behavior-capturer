@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Independent WBC Replica</title>
+    <link rel="stylesheet" href="/replica.css" />
+    <script src="/replica.js" defer></script>
+  </head>
+  <body>
+    <main class="stage">
+      <header class="intro">
+        <small>Independent implementation</small>
+        <h1>Contract-driven replica</h1>
+        <p>Different markup and JavaScript, equivalent observable behavior.</p>
+      </header>
+
+      <div class="demo-row">
+        <div class="copy"><h2>Pointer response</h2><p>Implemented on a different element structure.</p></div>
+        <button class="tile hover-equivalent" data-wbc-id="hover-card" type="button">
+          <span>Hover target</span><small>Independent replica</small>
+        </button>
+      </div>
+
+      <div class="demo-row">
+        <div class="copy"><h2>Programmatic keyframes</h2><p>WAAPI replaces the reference CSS animation.</p></div>
+        <div class="controls">
+          <button class="run" data-wbc-id="animation-trigger" type="button">Run motion</button>
+          <div class="tile animation-equivalent" data-wbc-id="css-animation">Keyframe target</div>
+        </div>
+      </div>
+
+      <div class="demo-row">
+        <div class="copy"><h2>Cancelable motion</h2><p>Entry and recovery preserve the same trajectory.</p></div>
+        <div class="tile interrupt-equivalent" data-wbc-id="interrupt-card">Interrupt target</div>
+      </div>
+
+      <div class="gap tall" aria-hidden="true"></div>
+
+      <div class="demo-row reveal-row">
+        <div class="copy"><h2>Scroll threshold</h2><p>A scroll listener replaces IntersectionObserver.</p></div>
+        <div class="tile reveal-equivalent" data-wbc-id="scroll-reveal">Threshold reveal target</div>
+      </div>
+
+      <div class="gap short" aria-hidden="true"></div>
+
+      <div class="demo-row scrub-row" data-scroll-region>
+        <div class="copy"><h2>Library-independent scrub</h2><p>A direct scroll calculation replaces GSAP.</p></div>
+        <div class="rail"><div class="scrub-equivalent" data-wbc-id="gsap-scrub">Scroll-linked target</div></div>
+      </div>
+
+      <div class="tail" aria-hidden="true"></div>
+    </main>
+  </body>
+</html>

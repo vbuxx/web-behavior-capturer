@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wbc.local/schema/session-index-1.0.0.json",
+  "title": "Website Behavior Capture Session Index Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "database", "contract", "counts"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "database": { "$ref": "#/$defs/file" },
+    "contract": { "$ref": "#/$defs/file" },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targets", "behaviors", "evidence", "records"],
+      "properties": {
+        "targets": { "type": "integer", "minimum": 1 },
+        "behaviors": { "type": "integer", "minimum": 1 },
+        "evidence": { "type": "integer", "minimum": 1 },
+        "records": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

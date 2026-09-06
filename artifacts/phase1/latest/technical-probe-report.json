@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.0.0",
+  "probeId": "ba6d25b6-98ca-40ec-b6b3-3b3e57677da7",
+  "generatedAt": "2026-09-06T03:19:51.559Z",
+  "browserVersion": "140.0.7339.16",
+  "mode": "diagnostic",
+  "shortAnimation": {
+    "expectedDurationMs": 72,
+    "waapiObserved": true,
+    "waapiDurationMs": 72,
+    "cdpLifecycleObserved": true,
+    "cdpDurationMs": 72,
+    "status": "passed"
+  },
+  "targetCoverage": [
+    {
+      "target": "main_frame",
+      "status": "supported",
+      "evidence": "http://127.0.0.1:59782/probes/"
+    },
+    {
+      "target": "same_origin_iframe",
+      "status": "supported",
+      "evidence": "http://127.0.0.1:59782/probe-frame/"
+    },
+    {
+      "target": "cross_origin_iframe",
+      "status": "supported",
+      "evidence": "http://localhost:59781/cross-origin-frame/"
+    },
+    {
+      "target": "dedicated_worker",
+      "status": "supported",
+      "evidence": "http://127.0.0.1:59782/probe-worker.js"
+    }
+  ],
+  "identity": {
+    "beforeInstance": "first",
+    "afterInstance": "second",
+    "recreated": true,
+    "stableLogicalRef": "data-wbc-id=identity-probe",
+    "status": "passed"
+  },
+  "clockMapping": {
+    "method": "performance.timeOrigin + performance.now compared with Date.now",
+    "maxAbsoluteErrorMs": 0.9,
+    "samples": 10,
+    "status": "passed"
+  },
+  "autoAttach": {
+    "attachedTargetTypes": [
+      "iframe",
+      "worker"
+    ],
+    "workerDiscoveredByCdp": true,
+    "oopifDiscoveredByCdp": true,
+    "childCollectorInstalled": true,
+    "status": "passed"
+  },
+  "lateAttach": {
+    "attachAtMs": 151.2,
+    "activeAnimationsAtAttach": 0,
+    "lifecycleEventsBeforeAttach": 0,
+    "gap": "page_load_to_attach",
+    "completeness": "partial",
+    "status": "passed"
+  },
+  "navigationRace": {
+    "observedUrls": [
+      "http://127.0.0.1:59782/race-start/",
+      "http://127.0.0.1:59782/race-end/"
+    ],
+    "startObserved": true,
+    "endObserved": true,
+    "oldNodeInvalidated": true,
+    "finalEpoch": "end",
+    "status": "passed"
+  },
+  "summary": {
+    "passed": 10,
+    "failed": 0,
+    "total": 10
+  },
+  "limitations": [
+    "Cross-origin OOPIF is forced with site-per-process in a diagnostic browser launch; natural capture still uses default launch flags.",
+    "Child collector installation is proven for the OOPIF frame, but not recursively for workers spawned by child targets.",
+    "The 72 ms fixture does not establish a minimum supported animation duration.",
+    "Clock comparison covers one page realm and does not calibrate OOPIF or worker clocks."
+  ]
+}

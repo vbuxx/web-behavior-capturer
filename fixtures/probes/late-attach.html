@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      [data-wbc-id='late-animation'] { animation: late-flash 64ms linear; }
+      @keyframes late-flash { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+  </head>
+  <body data-late-attach-ready="true">
+    <div data-wbc-id="late-animation">Animation starts at page load</div>
+  </body>
+</html>

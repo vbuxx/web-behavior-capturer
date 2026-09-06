@@ -1,0 +1,33 @@
+{
+  "name": "website-behavior-capture",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Local capture and verification engine for Website Behavior Capture",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "capture": "tsx src/cli.ts capture",
+    "inspect": "tsx src/cli.ts inspect",
+    "query": "tsx src/cli.ts query",
+    "verify": "tsx src/cli.ts verify",
+    "verify:replica": "tsx src/cli.ts verify --target replica",
+    "probe": "tsx src/cli.ts probe",
+    "test": "tsx --test test/**/*.test.ts",
+    "test:e2e": "tsx --test test/e2e.test.ts"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
+    "gsap": "3.13.0",
+    "playwright": "1.55.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2"
+  },
+  "packageManager": "pnpm@11.19.0"
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0.0",
+  "suiteId": "phase0-held-out-v1",
+  "viewport": { "width": 1100, "height": 740 },
+  "scenarios": [
+    {
+      "scenarioId": "hover-complete",
+      "behaviorId": "hover-card-enter",
+      "kind": "hover",
+      "parameters": { "settleBufferMs": 80, "positionTolerancePx": 2, "minimumOpacityDelta": 0.1 }
+    },
+    {
+      "scenarioId": "css-animation-lifecycle",
+      "behaviorId": "css-keyframe-pulse",
+      "kind": "css_animation",
+      "parameters": { "sampleAtMs": 80, "durationToleranceMs": 1 }
+    },
+    {
+      "scenarioId": "interrupt-quarter-duration",
+      "behaviorId": "interrupted-card-hover",
+      "kind": "interrupted_transition",
+      "parameters": { "exitFraction": 0.25, "minimumExitMs": 40, "recoveryBufferMs": 100, "positionTolerancePx": 2, "opacityTolerance": 0.03 }
+    },
+    {
+      "scenarioId": "scroll-reveal-reverse",
+      "behaviorId": "scroll-threshold-reveal",
+      "kind": "scroll_reveal",
+      "parameters": { "scanWindowPx": 900, "scanStepPx": 20, "reverseOffsetPx": 520, "minimumOpacityDelta": 0.05, "opacityTolerance": 0.03 }
+    },
+    {
+      "scenarioId": "scrub-held-out-reverse",
+      "behaviorId": "gsap-scrolltrigger-scrub",
+      "kind": "gsap_scrub",
+      "parameters": { "scanStepPx": 20, "boundaryMotionPx": 0.2, "progressPoints": [0.2, 0.8, 0.4], "progressTolerance": 0.02 }
+    }
+  ]
+}

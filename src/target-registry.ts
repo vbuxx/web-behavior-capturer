@@ -1,0 +1,417 @@
+import type { Frame, Page, Worker } from 'playwright';
+import { readPageObserver, type PageObserverState } from './browser-observer.js';
+import type { CaptureTargetKind, EvidenceRecord, TargetCoverage } from './types.js';
+
+interface WorkerObserverState {
+  records: Array<{
+    id: string;
+    sequence: number;
+    sourceTime: number;
+    receiveTime: number;
+    type: string;
+    payload: Record<string, unknown>;
+  }>;
+  droppedRecords: number;
+  timeOrigin: number;
+  now: number;
+}
+
+interface RealmClock {
+  timeOrigin: number;
+  now: number;
+}
+
+interface RealmSnapshot<T> {
+  observer?: T;
+  clock?: RealmClock;
+  checkpointAt: number;
+  hostBefore: number;
+  hostReceiveTime: number;
+  failure?: string;
+}
+
+interface RegisteredFrame {
+  frame: Frame;
+  logicalId: string;
+  targetId: string;
+  navigationId: string;
+  epoch: number;
+  parentTargetId: string | null;
+  attachedAt: number;
+  url: string;
+  lifecycleStatus: TargetCoverage['lifecycleStatus'];
+  detachedAt?: number;
+  coverageEnd?: number;
+  snapshot?: RealmSnapshot<PageObserverState>;
+  lifecycleGap?: string;
+}
+
+interface RegisteredWorker {
+  worker: Worker;
+  targetId: string;
+  navigationId: string;
+  epoch: number;
+  parentTargetId: string;
+  attachedAt: number;
+  url: string;
+  lifecycleStatus: TargetCoverage['lifecycleStatus'];
+  detachedAt?: number;
+  coverageEnd?: number;
+  installation: Promise<void>;
+  installationError?: string;
+  snapshot?: RealmSnapshot<WorkerObserverState>;
+  lifecycleGap?: string;
+}
+
+export interface CollectedTargetRecord {
+  targetId: string;
+  record: EvidenceRecord;
+}
+
+export interface TargetRegistrySnapshot {
+  coverage: TargetCoverage[];
+  records: CollectedTargetRecord[];
+}
+
+function clockMapping(snapshot: RealmSnapshot<unknown>): NonNullable<TargetCoverage['clockMapping']> | undefined {
+  if (!snapshot.clock) return undefined;
+  const mappedEpoch = snapshot.clock.timeOrigin + snapshot.clock.now;
+  const hostMidpoint = snapshot.hostBefore + ((snapshot.hostReceiveTime - snapshot.hostBefore) / 2);
+  const roundTripUncertainty = (snapshot.hostReceiveTime - snapshot.hostBefore) / 2;
+  return {
+    sourceTimeOrigin: { value: snapshot.clock.timeOrigin, unit: 'epoch_ms' },
+    observedAt: { value: snapshot.clock.now, unit: 'ms' },
+    mappedEpoch: { value: mappedEpoch, unit: 'epoch_ms' },
+    hostReceiveTime: { value: snapshot.hostReceiveTime, unit: 'epoch_ms' },
+    estimatedError: { value: Math.abs(hostMidpoint - mappedEpoch) + roundTripUncertainty, unit: 'ms' },
+  };
+}
+
+function isInitialUrl(url: string): boolean {
+  return url === '' || url === 'about:blank';
+}
+
+function classifyFrame(url: string, mainUrl: string, logicalId: string): CaptureTargetKind {
+  if (logicalId === 'main') return 'main_frame';
+  try {
+    return new URL(url).origin === new URL(mainUrl).origin
+      ? 'same_origin_iframe'
+      : 'cross_origin_iframe';
+  } catch {
+    return 'same_origin_iframe';
+  }
+}
+
+export class TargetRegistry {
+  readonly #page: Page;
+  readonly #maxRecords: number;
+  readonly #currentFrames = new Map<Frame, RegisteredFrame>();
+  readonly #frameHistory: RegisteredFrame[] = [];
+  readonly #frameEpochs = new Map<string, number>();
+  readonly #currentWorkers = new Map<Worker, RegisteredWorker>();
+  readonly #workerHistory: RegisteredWorker[] = [];
+  #nextFrame = 0;
+  #nextWorker = 0;
+  #mainEpoch = 1;
+
+  constructor(page: Page, maxRecords = 10_000) {
+    this.#page = page;
+    this.#maxRecords = maxRecords;
+    this.#registerFrame(page.mainFrame(), null, 'main');
+    page.on('frameattached', (frame) => this.#registerFrame(frame));
+    page.on('framenavigated', (frame) => this.#handleFrameNavigation(frame));
+    page.on('framedetached', (frame) => this.#archiveFrame(frame, 'detached'));
+    page.on('worker', (worker) => this.#registerWorker(worker));
+  }
+
+  #createFrameEntry(frame: Frame, logicalId: string, epoch: number, parentTargetId: string | null): RegisteredFrame {
+    const rootNavigationId = parentTargetId?.split(':')[0] ?? `nav-${this.#mainEpoch}`;
+    const isMain = logicalId === 'main';
+    const navigationId = isMain ? rootNavigationId : `${rootNavigationId}/${logicalId}/${epoch}`;
+    const targetId = isMain ? `${rootNavigationId}:main` : `${rootNavigationId}:${logicalId}:epoch-${epoch}`;
+    const entry: RegisteredFrame = {
+      frame,
+      logicalId,
+      targetId,
+      navigationId,
+      epoch,
+      parentTargetId,
+      attachedAt: Date.now(),
+      url: frame.url(),
+      lifecycleStatus: 'active',
+    };
+    this.#currentFrames.set(frame, entry);
+    this.#frameHistory.push(entry);
+    this.#frameEpochs.set(logicalId, epoch);
+    return entry;
+  }
+
+  #registerFrame(frame: Frame, explicitParent: string | null = null, explicitLogicalId?: string): RegisteredFrame {
+    const existing = this.#currentFrames.get(frame);
+    if (existing) return existing;
+    const logicalId = explicitLogicalId ?? `frame-${++this.#nextFrame}`;
+    const parent = frame.parentFrame();
+    const parentTargetId = logicalId === 'main'
+      ? null
+      : (parent ? this.#registerFrame(parent).targetId : explicitParent);
+    return this.#createFrameEntry(frame, logicalId, 1, parentTargetId);
+  }
+
+  #handleFrameNavigation(frame: Frame): void {
+    const current = this.#currentFrames.get(frame) ?? this.#registerFrame(frame);
+    const nextUrl = frame.url();
+    if (isInitialUrl(current.url)) {
+      current.url = nextUrl;
+      current.attachedAt = Date.now();
+      return;
+    }
+    if (nextUrl === current.url) return;
+
+    this.#archiveFrame(frame, 'navigated');
+    if (current.logicalId === 'main') this.#mainEpoch += 1;
+    const nextEpoch = (this.#frameEpochs.get(current.logicalId) ?? current.epoch) + 1;
+    const parent = frame.parentFrame();
+    const parentTargetId = current.logicalId === 'main'
+      ? null
+      : (parent ? this.#currentFrames.get(parent)?.targetId ?? current.parentTargetId : current.parentTargetId);
+    this.#createFrameEntry(frame, current.logicalId, nextEpoch, parentTargetId);
+  }
+
+  #archiveFrame(frame: Frame, status: 'navigated' | 'detached'): void {
+    const current = this.#currentFrames.get(frame);
+    if (!current || current.lifecycleStatus !== 'active') return;
+    const endedAt = Date.now();
+    current.lifecycleStatus = status;
+    current.detachedAt = endedAt;
+    current.coverageEnd = current.snapshot?.checkpointAt ?? endedAt;
+    current.lifecycleGap = status === 'navigated'
+      ? 'checkpoint_to_navigation_unobserved'
+      : 'checkpoint_to_detach_unobserved';
+    this.#currentFrames.delete(frame);
+  }
+
+  #registerWorker(worker: Worker): void {
+    if (this.#currentWorkers.has(worker)) return;
+    const workerNumber = ++this.#nextWorker;
+    const registered: RegisteredWorker = {
+      worker,
+      targetId: `nav-${this.#mainEpoch}:worker-${workerNumber}:epoch-1`,
+      navigationId: `nav-${this.#mainEpoch}/worker-${workerNumber}/1`,
+      epoch: 1,
+      parentTargetId: this.#currentFrames.get(this.#page.mainFrame())?.targetId ?? `nav-${this.#mainEpoch}:main`,
+      attachedAt: Date.now(),
+      url: worker.url(),
+      lifecycleStatus: 'active',
+      installation: Promise.resolve(),
+    };
+    registered.installation = worker.evaluate('globalThis.__name = globalThis.__name || ((target) => target)')
+      .then(() => worker.evaluate((limit) => {
+        const state = {
+          records: [] as WorkerObserverState['records'],
+          droppedRecords: 0,
+          sequence: 0,
+        };
+        const push = (type: string, payload: Record<string, unknown>) => {
+          if (state.records.length >= limit) {
+            state.droppedRecords += 1;
+            return;
+          }
+          state.sequence += 1;
+          state.records.push({
+            id: `worker-${state.sequence}`,
+            sequence: state.sequence,
+            sourceTime: performance.now(),
+            receiveTime: Date.now(),
+            type,
+            payload,
+          });
+        };
+        self.addEventListener('message', (event) => push('message-received', { dataType: typeof event.data }));
+        (globalThis as unknown as { __WBC_WORKER_OBSERVER__: typeof state }).__WBC_WORKER_OBSERVER__ = state;
+        push('collector-installed', { url: location.href });
+      }, this.#maxRecords))
+      .catch((error: unknown) => {
+        registered.installationError = error instanceof Error ? error.message : String(error);
+      });
+    this.#currentWorkers.set(worker, registered);
+    this.#workerHistory.push(registered);
+    worker.on('close', () => this.#archiveWorker(worker));
+  }
+
+  #archiveWorker(worker: Worker): void {
+    const current = this.#currentWorkers.get(worker);
+    if (!current || current.lifecycleStatus !== 'active') return;
+    const endedAt = Date.now();
+    current.lifecycleStatus = 'detached';
+    current.detachedAt = endedAt;
+    current.coverageEnd = current.snapshot?.checkpointAt ?? endedAt;
+    current.lifecycleGap = 'checkpoint_to_worker_destroy_unobserved';
+    this.#currentWorkers.delete(worker);
+  }
+
+  async #snapshotFrame(registered: RegisteredFrame): Promise<void> {
+    let observer: PageObserverState | undefined;
+    let clock: RealmClock | undefined;
+    let failure: string | undefined;
+    try {
+      observer = await readPageObserver(registered.frame);
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    }
+    const hostBefore = Date.now();
+    try {
+      clock = await registered.frame.evaluate(() => ({ timeOrigin: performance.timeOrigin, now: performance.now() }));
+    } catch (error) {
+      failure ??= error instanceof Error ? error.message : String(error);
+    }
+    registered.snapshot = {
+      ...(observer ? { observer } : {}),
+      ...(clock ? { clock } : {}),
+      checkpointAt: Date.now(),
+      hostBefore,
+      hostReceiveTime: Date.now(),
+      ...(failure ? { failure } : {}),
+    };
+  }
+
+  async #snapshotWorker(registered: RegisteredWorker): Promise<void> {
+    await registered.installation;
+    let observer: WorkerObserverState | undefined;
+    let clock: RealmClock | undefined;
+    let failure = registered.installationError;
+    if (!failure) {
+      try {
+        observer = await registered.worker.evaluate(() => {
+          const state = (globalThis as unknown as { __WBC_WORKER_OBSERVER__: Omit<WorkerObserverState, 'timeOrigin' | 'now'> }).__WBC_WORKER_OBSERVER__;
+          return { ...state, timeOrigin: performance.timeOrigin, now: performance.now() };
+        });
+      } catch (error) {
+        failure = error instanceof Error ? error.message : String(error);
+      }
+    }
+    const hostBefore = Date.now();
+    if (!failure) {
+      try {
+        clock = await registered.worker.evaluate(() => ({ timeOrigin: performance.timeOrigin, now: performance.now() }));
+      } catch (error) {
+        failure = error instanceof Error ? error.message : String(error);
+      }
+    }
+    registered.snapshot = {
+      ...(observer ? { observer } : {}),
+      ...(clock ? { clock } : {}),
+      checkpointAt: Date.now(),
+      hostBefore,
+      hostReceiveTime: Date.now(),
+      ...(failure ? { failure } : {}),
+    };
+  }
+
+  async checkpoint(): Promise<void> {
+    for (const registered of this.#currentFrames.values()) {
+      if (!registered.frame.isDetached()) await this.#snapshotFrame(registered);
+    }
+    for (const registered of this.#currentWorkers.values()) await this.#snapshotWorker(registered);
+  }
+
+  async collect(): Promise<TargetRegistrySnapshot> {
+    for (const frame of this.#page.frames()) this.#registerFrame(frame);
+    await this.checkpoint();
+
+    const coverage: TargetCoverage[] = [];
+    const records: CollectedTargetRecord[] = [];
+    const mainUrl = this.#frameHistory.find((entry) => entry.logicalId === 'main' && entry.lifecycleStatus === 'active')?.url
+      ?? this.#page.mainFrame().url();
+
+    for (const registered of this.#frameHistory) {
+      const observer = registered.snapshot?.observer;
+      if (observer) {
+        for (const raw of observer.records) {
+          const normalizedTargetRef = raw.targetRef?.replace('nav-1:main', registered.targetId);
+          records.push({
+            targetId: registered.targetId,
+            record: {
+              ...raw,
+              id: `${registered.targetId}:${raw.id}`,
+              ...(normalizedTargetRef ? { targetRef: normalizedTargetRef } : {}),
+            },
+          });
+        }
+      }
+      const droppedRecords = observer?.droppedRecords ?? 0;
+      const failed = !observer;
+      const archived = registered.lifecycleStatus !== 'active';
+      const gaps = [
+        ...(registered.lifecycleGap ? [registered.lifecycleGap] : []),
+        ...(registered.snapshot?.failure ? [`collector_unavailable: ${registered.snapshot.failure}`] : []),
+      ];
+      const mappedClock = registered.snapshot ? clockMapping(registered.snapshot) : undefined;
+      coverage.push({
+        targetId: registered.targetId,
+        navigationId: registered.navigationId,
+        epoch: registered.epoch,
+        parentTargetId: registered.parentTargetId,
+        kind: classifyFrame(registered.url, mainUrl, registered.logicalId),
+        url: registered.url,
+        attachedAt: { value: registered.attachedAt, unit: 'epoch_ms' },
+        ...(registered.detachedAt ? { detachedAt: { value: registered.detachedAt, unit: 'epoch_ms' as const } } : {}),
+        ...(registered.coverageEnd ? { coverageEnd: { value: registered.coverageEnd, unit: 'epoch_ms' as const } } : {}),
+        lifecycleStatus: registered.lifecycleStatus,
+        coverageStart: 'document_start',
+        collector: {
+          status: failed ? 'failed' : 'installed',
+          recordCount: observer?.records.length ?? 0,
+          droppedRecords,
+          knownLoss: droppedRecords > 0,
+        },
+        ...(mappedClock ? { clockMapping: mappedClock } : {}),
+        completeness: failed || archived ? 'partial' : 'full',
+        gaps,
+      });
+    }
+
+    for (const registered of this.#workerHistory) {
+      const observer = registered.snapshot?.observer;
+      if (observer) {
+        for (const raw of observer.records) {
+          records.push({
+            targetId: registered.targetId,
+            record: { ...raw, id: `${registered.targetId}:${raw.id}`, source: 'page' },
+          });
+        }
+      }
+      const droppedRecords = observer?.droppedRecords ?? 0;
+      const failed = !observer;
+      const gaps = [
+        'worker_start_to_collector_install',
+        ...(registered.lifecycleGap ? [registered.lifecycleGap] : []),
+        ...(registered.snapshot?.failure ? [`collector_install_failed: ${registered.snapshot.failure}`] : []),
+      ];
+      const mappedClock = registered.snapshot ? clockMapping(registered.snapshot) : undefined;
+      coverage.push({
+        targetId: registered.targetId,
+        navigationId: registered.navigationId,
+        epoch: registered.epoch,
+        parentTargetId: registered.parentTargetId,
+        kind: 'dedicated_worker',
+        url: registered.url,
+        attachedAt: { value: registered.attachedAt, unit: 'epoch_ms' },
+        ...(registered.detachedAt ? { detachedAt: { value: registered.detachedAt, unit: 'epoch_ms' as const } } : {}),
+        ...(registered.coverageEnd ? { coverageEnd: { value: registered.coverageEnd, unit: 'epoch_ms' as const } } : {}),
+        lifecycleStatus: registered.lifecycleStatus,
+        coverageStart: 'runtime',
+        collector: {
+          status: failed ? 'failed' : 'installed',
+          recordCount: observer?.records.length ?? 0,
+          droppedRecords,
+          knownLoss: droppedRecords > 0,
+        },
+        ...(mappedClock ? { clockMapping: mappedClock } : {}),
+        completeness: 'partial',
+        gaps,
+      });
+    }
+
+    return { coverage, records };
+  }
+}

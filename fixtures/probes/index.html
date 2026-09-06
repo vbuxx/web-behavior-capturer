@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WBC Technical Probes</title>
+    <link rel="stylesheet" href="/probes.css" />
+    <script src="/probes.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <h1>Technical probes</h1>
+      <section>
+        <h2>Short animation</h2>
+        <button data-wbc-id="short-trigger" type="button">Run 72 ms animation</button>
+        <div data-wbc-id="short-animation">Short animation target</div>
+      </section>
+      <section>
+        <h2>Frame and worker</h2>
+        <iframe title="same-origin probe" src="/probe-frame/"></iframe>
+        <iframe title="cross-origin probe" data-cross-origin-frame></iframe>
+        <output data-worker-status>waiting</output>
+      </section>
+      <section>
+        <h2>Element identity</h2>
+        <button data-wbc-id="recreate-trigger" type="button">Replace node</button>
+        <div data-wbc-id="identity-probe" data-instance="first">Identity target</div>
+      </section>
+    </main>
+  </body>
+</html>

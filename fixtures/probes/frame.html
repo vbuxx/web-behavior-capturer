@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <div data-wbc-id="frame-target">Same-origin frame target</div>
+    <iframe title="nested same-origin probe" src="/probe-frame-nested/"></iframe>
+    <script>
+      document.body.dataset.frameReady = 'true';
+      addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => document.body.classList.add('observer-signal'), 500);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /></head>
+  <body>
+    <div data-wbc-id="nested-frame-target">Nested same-origin frame target</div>
+    <script>
+      document.body.dataset.nestedFrameReady = 'true';
+      addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => { document.body.classList.add('observer-signal'); }, 25);
+      });
+    </script>
+  </body>
+</html>

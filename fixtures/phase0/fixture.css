@@ -1,0 +1,129 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  background: #f4f7fb;
+  color: #17304b;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: auto; }
+body { margin: 0; }
+
+header,
+main {
+  width: min(760px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+header { padding: 72px 0 36px; }
+h1 { margin: 8px 0 10px; font-size: clamp(2rem, 5vw, 4rem); }
+h2 { margin-top: 0; }
+.eyebrow { text-transform: uppercase; letter-spacing: .12em; color: #5d7590; }
+
+section {
+  margin: 32px 0;
+  padding: 28px;
+  border: 1px solid #c8d5e3;
+  border-radius: 18px;
+  background: white;
+}
+
+#hover-card,
+#interrupt-card,
+#css-animation,
+#scroll-reveal {
+  width: 280px;
+  min-height: 92px;
+  padding: 22px;
+  border-radius: 14px;
+  background: #e9f0f8;
+}
+
+#hover-card {
+  display: grid;
+  gap: 7px;
+  opacity: .72;
+  transform: translateY(0);
+  transition: transform 240ms cubic-bezier(.2, .8, .2, 1), opacity 240ms cubic-bezier(.2, .8, .2, 1);
+}
+
+#hover-card:hover {
+  opacity: 1;
+  transform: translateY(-12px);
+}
+
+#animation-trigger {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  color: white;
+  background: #315f8a;
+  font: inherit;
+  cursor: pointer;
+}
+
+#css-animation { margin-top: 20px; transform: translateX(0) scale(1); }
+#css-animation.running { animation: fixture-pulse 600ms ease-in-out 1 both; }
+
+@keyframes fixture-pulse {
+  0% { transform: translateX(0) scale(1); background-color: #e9f0f8; }
+  45% { transform: translateX(72px) scale(1.08); background-color: #b7d4ef; }
+  100% { transform: translateX(120px) scale(1); background-color: #8dbce7; }
+}
+
+#interrupt-card {
+  opacity: .58;
+  transform: translateX(0) scale(1);
+  transition: transform 420ms cubic-bezier(.4, 0, .2, 1), opacity 420ms linear;
+}
+
+#interrupt-card:hover {
+  opacity: 1;
+  transform: translateX(96px) scale(1.06);
+}
+
+.spacer { height: 720px; }
+.spacer.small { height: 360px; }
+
+#scroll-reveal {
+  opacity: 0;
+  transform: translateY(64px);
+  transition: opacity 360ms ease-out, transform 360ms ease-out;
+}
+
+#scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.scrub-track {
+  position: relative;
+  height: 180px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #edf2f7;
+}
+
+#gsap-scrub {
+  position: absolute;
+  left: 20px;
+  top: 54px;
+  width: 160px;
+  padding: 20px;
+  border-radius: 12px;
+  background: #315f8a;
+  color: white;
+}
+
+.footer-space { height: 900px; }
+
+.target-lab {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  left: -10000px;
+  top: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
