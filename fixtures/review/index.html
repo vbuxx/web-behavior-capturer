@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WBC Session Review</title>
+    <link rel="stylesheet" href="/review.css" />
+    <script src="/review.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Website Behavior Capture</p>
+        <h1>Session review</h1>
+        <p id="session-line">Loading verified package…</p>
+      </header>
+      <section aria-labelledby="summary-title">
+        <h2 id="summary-title">Integrity and coverage</h2>
+        <div class="metrics" id="metrics"></div>
+      </section>
+      <section aria-labelledby="behavior-title">
+        <h2 id="behavior-title">Behavior contracts</h2>
+        <div class="cards" id="behaviors"></div>
+      </section>
+      <section aria-labelledby="target-title">
+        <h2 id="target-title">Capture targets</h2>
+        <div class="table-wrap"><table><thead><tr><th>Target</th><th>Kind</th><th>Lifecycle</th><th>Coverage</th></tr></thead><tbody id="targets"></tbody></table></div>
+      </section>
+      <section aria-labelledby="evidence-title">
+        <div class="section-heading"><div><h2 id="evidence-title">Evidence sample</h2><p>First 20 bounded records from the verified index.</p></div><button id="reload" type="button">Reload</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Source</th><th>Type</th><th>Target</th><th>Time</th></tr></thead><tbody id="evidence"></tbody></table></div>
+      </section>
+      <p id="error" role="alert"></p>
+    </main>
+  </body>
+</html>

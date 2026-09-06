@@ -1,10 +1,10 @@
 {
   "schemaVersion": "1.0.0",
-  "verifiedAt": "2026-09-06T04:27:41.259Z",
-  "referenceSessionId": "1a7454bd-1504-4aa9-9a48-59216b80631c",
+  "verifiedAt": "2026-09-06T04:33:34.682Z",
+  "referenceSessionId": "aa85632c-e427-4305-9de4-decfb0082828",
   "scenarioSuiteId": "phase0-held-out-v1",
   "targetLabel": "replica",
-  "targetUrl": "http://127.0.0.1:63408/replica/",
+  "targetUrl": "http://127.0.0.1:63616/replica/",
   "heldOutConditions": [
     "Viewport 1100x740",
     "Scenario parameters loaded from versioned JSON",
@@ -52,7 +52,7 @@
       "metrics": {
         "heldOutExitMs": 105,
         "changedBeforeExit": true,
-        "interruptionTranslationX": 20.079,
+        "interruptionTranslationX": 29.493,
         "idleTranslationX": 0,
         "recoveredTranslationX": 0,
         "idleOpacity": 0.58,
@@ -75,7 +75,7 @@
         "hiddenAfterReverse": true,
         "reverseOpacity": 0,
         "locatorStrategy": "structural_fingerprint",
-        "locatorMinimumScore": 0.9712,
+        "locatorMinimumScore": 0.9714,
         "locatorMinimumMargin": 0.237,
         "locatorCandidateCount": 38
       },

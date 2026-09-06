@@ -106,7 +106,21 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error('Usage: tsx src/cli.ts <capture|verify|probe|inspect|query|evidence> [--out PATH] [--contract PATH] [--package PATH] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
+  if (command === 'review') {
+    const { startReviewServer } = await import('./review-server.js');
+    const packageDirectory = resolve(option('--package') ?? 'artifacts/phase1/latest');
+    const requestedPort = option('--port');
+    const server = await startReviewServer(packageDirectory, requestedPort ? Number(requestedPort) : 0);
+    console.log(JSON.stringify({ status: 'ready', url: server.url, package: packageDirectory }, null, 2));
+    await new Promise<void>((resolveStop) => {
+      const stop = (): void => { void server.close().then(resolveStop); };
+      process.once('SIGINT', stop);
+      process.once('SIGTERM', stop);
+    });
+    return;
+  }
+
+  console.error('Usage: tsx src/cli.ts <capture|verify|probe|inspect|query|evidence|review> [--out PATH] [--contract PATH] [--package PATH] [--port N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
   process.exitCode = 2;
 }
 

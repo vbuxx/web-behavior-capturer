@@ -1,10 +1,10 @@
 {
   "schemaVersion": "1.0.0",
-  "verifiedAt": "2026-09-06T04:27:27.279Z",
-  "referenceSessionId": "1a7454bd-1504-4aa9-9a48-59216b80631c",
+  "verifiedAt": "2026-09-06T04:33:21.943Z",
+  "referenceSessionId": "aa85632c-e427-4305-9de4-decfb0082828",
   "scenarioSuiteId": "phase0-held-out-v1",
   "targetLabel": "reference",
-  "targetUrl": "http://127.0.0.1:63399/reference/",
+  "targetUrl": "http://127.0.0.1:63607/reference/",
   "heldOutConditions": [
     "Viewport 1100x740",
     "Scenario parameters loaded from versioned JSON",
@@ -51,7 +51,7 @@
       "metrics": {
         "heldOutExitMs": 105,
         "changedBeforeExit": true,
-        "interruptionTranslationX": 20.102,
+        "interruptionTranslationX": 29.478,
         "idleTranslationX": 0,
         "recoveredTranslationX": 0,
         "idleOpacity": 0.58,
@@ -74,8 +74,8 @@
         "hiddenAfterReverse": true,
         "reverseOpacity": 0,
         "locatorStrategy": "captured_identity",
-        "locatorMinimumScore": 2.9801,
-        "locatorMinimumMargin": 2.3123,
+        "locatorMinimumScore": 2.9804,
+        "locatorMinimumMargin": 2.3128,
         "locatorCandidateCount": 31
       },
       "mismatches": []

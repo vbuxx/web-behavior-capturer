@@ -15,7 +15,7 @@ Artifact release pada viewport held-out 1100x740 menghasilkan replica 5/5:
 | hover complete | structural fingerprint | 0.6719 | 0.0221 | passed |
 | CSS animation lifecycle | structural fingerprint | 0.9012 | 0.0689 | passed |
 | interrupted transition | structural fingerprint | 0.7935 | 0.1960 | passed |
-| scroll reveal reverse | structural fingerprint | 0.9712 | 0.2370 | passed |
+| scroll reveal reverse | structural fingerprint | 0.9714 | 0.2370 | passed |
 | scrub held-out reverse | structural fingerprint | 0.9051 | 0.1065 | passed |
 
 Reference self-check juga lulus 5/5. Pada reference, captured identity tersedia dan dilaporkan sebagai strategi berbeda agar bukti structural replica tidak tercampur.
@@ -32,7 +32,7 @@ Negative fixture berisi dua button identik dan overlap. Resolver menolak keduany
 
 ## Overhead
 
-Capture release mencatat baseline p95 frame 16,8 ms dan capture p95 16,7 ms pada 264 sample, atau selisih -0,595% yang berada dalam noise timer. Nilai ini mengukur observer page-world, bukan biaya resolver. Resolver berjalan saat verification dan pada fixture replica menilai 38 kandidat per skenario. Belum ada benchmark CPU/memory resolver yang terpisah.
+Capture release mencatat baseline dan capture p95 frame yang sama-sama 16,8 ms pada 264 sample, atau selisih 0%. Nilai ini mengukur observer page-world, bukan biaya resolver. Resolver berjalan saat verification dan pada fixture replica menilai 38 kandidat per skenario. Belum ada benchmark CPU/memory resolver yang terpisah.
 
 ## Limitations and Scope Revision
 

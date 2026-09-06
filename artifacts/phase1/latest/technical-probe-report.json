@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
-  "probeId": "12573e4c-7ef8-43aa-9f53-8af9f2c4eac3",
-  "generatedAt": "2026-09-06T04:27:44.949Z",
+  "probeId": "3a1da5cd-1521-40dc-ae8d-c387fbbc02c8",
+  "generatedAt": "2026-09-06T04:33:37.948Z",
   "browserVersion": "140.0.7339.16",
   "mode": "diagnostic",
   "shortAnimation": {
@@ -16,22 +16,22 @@
     {
       "target": "main_frame",
       "status": "supported",
-      "evidence": "http://127.0.0.1:63413/probes/"
+      "evidence": "http://127.0.0.1:63623/probes/"
     },
     {
       "target": "same_origin_iframe",
       "status": "supported",
-      "evidence": "http://127.0.0.1:63413/probe-frame/"
+      "evidence": "http://127.0.0.1:63623/probe-frame/"
     },
     {
       "target": "cross_origin_iframe",
       "status": "supported",
-      "evidence": "http://localhost:63412/cross-origin-frame/"
+      "evidence": "http://localhost:63622/cross-origin-frame/"
     },
     {
       "target": "dedicated_worker",
       "status": "supported",
-      "evidence": "http://127.0.0.1:63413/probe-worker.js"
+      "evidence": "http://127.0.0.1:63623/probe-worker.js"
     }
   ],
   "identity": {
@@ -58,7 +58,7 @@
     "status": "passed"
   },
   "lateAttach": {
-    "attachAtMs": 149.2,
+    "attachAtMs": 151.5,
     "activeAnimationsAtAttach": 0,
     "lifecycleEventsBeforeAttach": 0,
     "gap": "page_load_to_attach",
@@ -67,8 +67,8 @@
   },
   "navigationRace": {
     "observedUrls": [
-      "http://127.0.0.1:63413/race-start/",
-      "http://127.0.0.1:63413/race-end/"
+      "http://127.0.0.1:63623/race-start/",
+      "http://127.0.0.1:63623/race-end/"
     ],
     "startObserved": true,
     "endObserved": true,

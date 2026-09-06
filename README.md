@@ -14,7 +14,7 @@ Lima perilaku yang menjadi exit criterion spike sudah dapat ditangkap dan diveri
 - scroll reveal dengan reverse probe;
 - GSAP ScrollTrigger dengan `scrub: true`.
 
-Fase 0 telah selesai. Fase 1 sekarang membawa target registry, lifecycle lintas navigasi, reopenable session index, structured-data redaction, budgeted evidence query, element identity lintas frame, dan resolver struktural independen ke natural capture. Behavior Contract schema 1.5.0 mencatat target/navigation epoch, loss, redaction, locator candidates, bounds, structural fingerprint, dan ambiguity. SQLite sidecar menyediakan query tanpa membuka website sumber.
+Fase 0 telah selesai. Fase 1 sekarang membawa target registry, lifecycle lintas navigasi, reopenable session index, structured-data redaction, budgeted evidence query, element identity lintas frame, resolver struktural independen, serta review UI lokal. Behavior Contract schema 1.5.0 mencatat target/navigation epoch, loss, redaction, locator candidates, bounds, structural fingerprint, dan ambiguity. SQLite sidecar menyediakan query tanpa membuka website sumber.
 
 Hasil terbaru tersedia di [artifacts/phase1/latest/behavior-contract.json](artifacts/phase1/latest/behavior-contract.json), [artifacts/phase1/latest/verification-reference.json](artifacts/phase1/latest/verification-reference.json), [artifacts/phase1/latest/verification-replica.json](artifacts/phase1/latest/verification-replica.json), dan [artifacts/phase1/latest/technical-probe-report.json](artifacts/phase1/latest/technical-probe-report.json). Kedua target verifikasi lulus 5/5 dan technical probe diagnostik lulus 10/10. Baseline Fase 0 tetap disimpan di `artifacts/phase0/latest`.
 
@@ -30,6 +30,7 @@ pnpm run capture -- --out .wbc/phase1
 pnpm run inspect -- --package .wbc/phase1
 pnpm run query -- --package .wbc/phase1 --kind gsap_scrub --limit 10
 pnpm run evidence -- --package .wbc/phase1 --type mutation --limit 20 --byte-budget 65536
+pnpm run review -- --package artifacts/phase1/latest
 pnpm run verify -- --contract .wbc/phase1/behavior-contract.json --target reference
 pnpm run verify:replica -- --contract .wbc/phase1/behavior-contract.json
 pnpm run probe -- --out .wbc/phase1/technical-probe-report.json
@@ -51,6 +52,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `src/session-index.ts` membangun, membuka ulang, dan memverifikasi SQLite sidecar serta query behavior terfilter.
 - `src/redaction.ts` menghapus credential terstruktur sebelum data masuk JSONL, contract, atau SQLite.
 - `src/locator-resolver.ts` mencocokkan elemen replika dari fingerprint struktural dan menolak confidence yang ambigu.
+- `src/review-server.ts` menyajikan session API dan viewer read-only hanya pada loopback setelah integrity verification.
 - `src/verify.ts` menjalankan skenario held-out terhadap fixture baru.
 - `src/scenarios.ts` memvalidasi dan membaca suite skenario JSON berversi.
 - `src/browser-observer.ts` memasang page-world observer sebelum script fixture.
@@ -59,6 +61,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `fixtures/phase0` berisi ground-truth lokal dan GSAP yang disajikan dari dependency lokal.
 - `fixtures/replica` berisi implementasi independen tanpa GSAP, selector sumber, atau shared `data-wbc-id`.
 - `fixtures/probes` menguji lifecycle 72 ms, same-origin dan cross-origin iframe/OOPIF, worker, late attach, navigation race, clock mapping, dan node recreation.
+- `fixtures/review` berisi UI inspeksi session, target, behavior, dan evidence sample.
 - `scenarios/phase0-held-out.json` mengatur viewport, interruption, toleransi, scan, dan progress points.
 - `test/e2e.test.ts` membuktikan capture, provenance, checksum, unit schema, held-out verification, dan pelaporan overflow.
 - `docs/decisions/0001-phase-0-technical-baseline.md` mencatat keputusan engineering awal.
@@ -72,6 +75,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0009-budgeted-evidence-query.md` menetapkan filter, cursor revision, serta record/byte budget.
 - `docs/decisions/0010-target-scoped-element-identity.md` menetapkan locator candidates dan ambiguity lintas epoch.
 - `docs/decisions/0011-independent-structural-locator.md` menetapkan fingerprint, confidence gate, dan larangan fallback diam-diam.
+- `docs/decisions/0012-loopback-review-service.md` menetapkan integrity gate, API read-only, dan security headers viewer.
 - `docs/PHASE-0-REPORT.md` berisi hasil, keterbatasan, overhead, dan revisi scope.
 - `docs/PHASE-1-FOUNDATION-REPORT.md` berisi hasil irisan fondasi capture pertama.
 - `docs/PHASE-1-LIFECYCLE-REPORT.md` berisi hasil navigation epoch dan detach coverage.
@@ -80,6 +84,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/PHASE-1-QUERY-REPORT.md` berisi hasil evidence query dan pagination integrity.
 - `docs/PHASE-1-ELEMENT-REPORT.md` berisi hasil element registry lintas frame/navigation.
 - `docs/PHASE-1-LOCATOR-REPORT.md` berisi bukti cross-implementation resolver, overhead, keterbatasan, dan revisi scope.
+- `docs/PHASE-1-REVIEW-REPORT.md` berisi bukti service/viewer lokal dan batas operasionalnya.
 
 ## Batas interpretasi
 

@@ -6,7 +6,7 @@ Status: completed. Persistence redaction continues in [PHASE-1-REDACTION-REPORT.
 
 Natural capture sekarang menghasilkan `session.sqlite` dan `session-index.json` di samping Behavior Contract dan evidence. Paket dapat dibuka kembali melalui CLI tanpa mengunjungi fixture sumber. Inspection menolak paket sebelum query jika checksum, schema, semantic reference, metadata, atau row count tidak konsisten.
 
-Artefak terakhir berukuran sekitar 564 KB. SQLite berukuran 248 KB dan mengindeks 7 target epoch, 13 element, 5 behavior, 307 evidence reference, serta 292 normalized record.
+Artefak terakhir berukuran sekitar 572 KB. SQLite berukuran 252 KB dan mengindeks 7 target epoch, 13 element, 5 behavior, 306 evidence reference, serta 291 normalized record.
 
 ## Indexed Data
 

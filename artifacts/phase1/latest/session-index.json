@@ -1,19 +1,19 @@
 {
   "schemaVersion": "1.1.0",
-  "generatedAt": "2026-09-06T04:27:13.810Z",
+  "generatedAt": "2026-09-06T04:33:09.251Z",
   "database": {
     "path": "session.sqlite",
-    "sha256": "51f84ba9eb393dad16077fca65ef26744d79f4a7480e41710d13cdb890ac0394"
+    "sha256": "d5f78c73c19d1863a3987fa3513bdd0804844516f17802bd0b318ea8ce5d2bee"
   },
   "contract": {
     "path": "behavior-contract.json",
-    "sha256": "b133b0f88f7b8f0bfd9971e5af4935187c6f94cba637b13fccba9b3dcef91426"
+    "sha256": "0451fd03ec06384f18c015e6f7c73852111fabbf3d04ce0682cd609d7756fda2"
   },
   "counts": {
     "targets": 7,
     "elements": 13,
     "behaviors": 5,
-    "evidence": 307,
-    "records": 292
+    "evidence": 306,
+    "records": 291
   }
 }
