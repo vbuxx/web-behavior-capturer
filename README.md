@@ -34,6 +34,7 @@ pnpm run review -- --package artifacts/phase1/latest
 pnpm run benchmark -- --package artifacts/phase1/latest --iterations 3
 pnpm run benchmark:synthetic -- --package artifacts/phase1/latest --records 50000 --evidence-mb 100 --iterations 3
 pnpm run benchmark:browser -- --iterations 2
+pnpm run benchmark:capture -- --overhead-runs 1
 pnpm run verify -- --contract .wbc/phase1/behavior-contract.json --target reference
 pnpm run verify:replica -- --contract .wbc/phase1/behavior-contract.json
 pnpm run probe -- --out .wbc/phase1/technical-probe-report.json
@@ -81,6 +82,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0012-loopback-review-service.md` menetapkan integrity gate, API read-only, dan security headers viewer.
 - `docs/decisions/0013-package-latency-benchmark.md` menetapkan baseline latency package dan gate synthetic load.
 - `docs/decisions/0014-synthetic-browser-load-benchmark.md` menetapkan baseline route browser 5.000 node/50 track.
+- `docs/decisions/0015-capture-finalization-benchmark.md` menetapkan wall-clock capture sampai reopenable package.
 - `docs/PHASE-0-REPORT.md` berisi hasil, keterbatasan, overhead, dan revisi scope.
 - `docs/PHASE-1-FOUNDATION-REPORT.md` berisi hasil irisan fondasi capture pertama.
 - `docs/PHASE-1-LIFECYCLE-REPORT.md` berisi hasil navigation epoch dan detach coverage.
@@ -92,6 +94,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/PHASE-1-REVIEW-REPORT.md` berisi bukti service/viewer lokal dan batas operasionalnya.
 - `docs/PHASE-1-BENCHMARK-REPORT.md` berisi baseline startup/query latency serta target synthetic load berikutnya.
 - `docs/PHASE-1-BROWSER-BENCHMARK-REPORT.md` berisi hasil runtime browser pada route synthetic 5.000 node/50 track.
+- `docs/PHASE-1-FINALIZATION-BENCHMARK-REPORT.md` berisi waktu capture end-to-end dan quality package.
 
 ## Batas interpretasi
 

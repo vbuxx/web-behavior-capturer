@@ -14,6 +14,7 @@
     "benchmark": "tsx src/cli.ts benchmark",
     "benchmark:synthetic": "tsx src/cli.ts benchmark --synthetic",
     "benchmark:browser": "tsx src/cli.ts browser-benchmark",
+    "benchmark:capture": "tsx src/cli.ts capture-benchmark",
     "verify": "tsx src/cli.ts verify",
     "verify:replica": "tsx src/cli.ts verify --target replica",
     "probe": "tsx src/cli.ts probe",
