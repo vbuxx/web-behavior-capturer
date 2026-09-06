@@ -155,7 +155,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error('Usage: tsx src/cli.ts <capture|verify|probe|inspect|query|evidence|review|benchmark|browser-benchmark|capture-benchmark|reliability-benchmark> [--out PATH] [--contract PATH] [--package PATH] [--port N] [--parallel N] [--cycles N] [--iterations N] [--synthetic] [--records N] [--evidence-mb N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
+  if (command === 'crash-benchmark') {
+    const { runCrashInjection } = await import('./crash-benchmark.js');
+    console.log(JSON.stringify(await runCrashInjection(Number(option('--kill-after-ms') ?? 1_000)), null, 2));
+    return;
+  }
+
+  console.error('Usage: tsx src/cli.ts <capture|verify|probe|inspect|query|evidence|review|benchmark|browser-benchmark|capture-benchmark|reliability-benchmark|crash-benchmark> [--out PATH] [--package PATH] [--port N] [--parallel N] [--cycles N] [--kill-after-ms N] [--iterations N] [--synthetic] [--records N] [--evidence-mb N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
   process.exitCode = 2;
 }
 

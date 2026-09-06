@@ -36,6 +36,7 @@ pnpm run benchmark:synthetic -- --package artifacts/phase1/latest --records 5000
 pnpm run benchmark:browser -- --iterations 2
 pnpm run benchmark:capture -- --overhead-runs 1
 pnpm run benchmark:reliability -- --parallel 2 --cycles 1
+pnpm run benchmark:crash -- --kill-after-ms 15000
 pnpm run verify -- --contract .wbc/phase1/behavior-contract.json --target reference
 pnpm run verify:replica -- --contract .wbc/phase1/behavior-contract.json
 pnpm run probe -- --out .wbc/phase1/technical-probe-report.json
@@ -85,6 +86,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0014-synthetic-browser-load-benchmark.md` menetapkan baseline route browser 5.000 node/50 track.
 - `docs/decisions/0015-capture-finalization-benchmark.md` menetapkan wall-clock capture sampai reopenable package.
 - `docs/decisions/0016-parallel-capture-reliability.md` menetapkan isolation dan repeatability benchmark antar-session.
+- `docs/decisions/0017-crash-injection-fail-closed.md` menetapkan crash gate dan rejection fail-closed untuk output parsial.
 - `docs/PHASE-0-REPORT.md` berisi hasil, keterbatasan, overhead, dan revisi scope.
 - `docs/PHASE-1-FOUNDATION-REPORT.md` berisi hasil irisan fondasi capture pertama.
 - `docs/PHASE-1-LIFECYCLE-REPORT.md` berisi hasil navigation epoch dan detach coverage.
@@ -98,6 +100,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/PHASE-1-BROWSER-BENCHMARK-REPORT.md` berisi hasil runtime browser pada route synthetic 5.000 node/50 track.
 - `docs/PHASE-1-FINALIZATION-BENCHMARK-REPORT.md` berisi waktu capture end-to-end dan quality package.
 - `docs/PHASE-1-RELIABILITY-REPORT.md` berisi hasil parallel capture dan isolation check.
+- `docs/PHASE-1-CRASH-REPORT.md` berisi hasil interruption gate dan batas recovery yang masih tersisa.
 
 ## Batas interpretasi
 

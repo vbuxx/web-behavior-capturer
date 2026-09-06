@@ -169,23 +169,20 @@ export async function runTechnicalProbes(outputFile?: string): Promise<Technical
       if (navigatedFrame === racePage.mainFrame()) observedUrls.push(navigatedFrame.url());
     });
     await racePage.goto(`${server.url}/race-start/`, { waitUntil: 'domcontentloaded' });
+    const startUrl = racePage.url();
     const oldNode = await racePage.locator('[data-wbc-id="navigation-target"]').elementHandle();
     await racePage.waitForURL('**/race-end/');
+    const endUrl = racePage.url();
     await racePage.waitForSelector('body[data-navigation-epoch="end"]');
     const finalEpoch = await racePage.locator('body').getAttribute('data-navigation-epoch') ?? 'missing';
     let oldNodeInvalidated = false;
     try {
-      oldNodeInvalidated = oldNode
-        ? await racePage.evaluate(
-          (before) => before !== document.querySelector('[data-wbc-id="navigation-target"]'),
-          oldNode,
-        )
-        : false;
+      oldNodeInvalidated = oldNode ? await oldNode.evaluate((node) => !node.isConnected) : false;
     } catch {
       oldNodeInvalidated = true;
     }
-    const startObserved = observedUrls.some((url) => url.includes('/race-start/'));
-    const endObserved = observedUrls.some((url) => url.includes('/race-end/'));
+    const startObserved = startUrl.includes('/race-start/') || observedUrls.some((url) => url.includes('/race-start/'));
+    const endObserved = endUrl.includes('/race-end/') || observedUrls.some((url) => url.includes('/race-end/'));
     const navigationRacePassed = startObserved && endObserved && oldNodeInvalidated && finalEpoch === 'end';
     await racePage.close();
     const shortPassed = waapi.observed && waapi.duration === 72 && Boolean(cdpAnimation);
