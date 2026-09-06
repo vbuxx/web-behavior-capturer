@@ -32,6 +32,11 @@ export async function validateContract(value: unknown): Promise<ContractPackage>
   const evidenceIds = new Set(contract.evidenceIndex.map((entry) => entry.id));
   const targetIds = new Set(contract.manifest.targetCoverage.map((target) => target.targetId));
   const targetNavigationIds = new Set(contract.manifest.targetCoverage.map((target) => target.navigationId));
+  const targetsById = new Map(contract.manifest.targetCoverage.map((target) => [target.targetId, target]));
+
+  if (elementIds.size !== contract.elements.length) {
+    throw new Error('Element registry contains duplicate element IDs');
+  }
 
   if (targetIds.size !== contract.manifest.targetCoverage.length) {
     throw new Error('Target coverage contains duplicate target IDs');
@@ -69,6 +74,22 @@ export async function validateContract(value: unknown): Promise<ContractPackage>
   if (contract.manifest.quality.droppedRecords !== targetDroppedRecords
     || contract.manifest.quality.knownLoss !== (targetDroppedRecords > 0)) {
     throw new Error('Manifest loss summary does not match per-target coverage');
+  }
+
+  for (const element of contract.elements) {
+    const target = targetsById.get(element.targetId);
+    if (!target) throw new Error(`Element ${element.id} has missing target ${element.targetId}`);
+    if (element.navigationId !== target.navigationId) {
+      throw new Error(`Element ${element.id} navigation does not match target epoch`);
+    }
+    const preferred = element.locatorCandidates[0];
+    if (!preferred || preferred.strategy !== element.ambiguity.preferredStrategy
+      || preferred.matchCount !== element.ambiguity.matchCount || preferred.value !== element.selector) {
+      throw new Error(`Element ${element.id} has inconsistent preferred locator`);
+    }
+    if ((preferred.matchCount === 1) !== (element.ambiguity.status === 'unique')) {
+      throw new Error(`Element ${element.id} has inconsistent ambiguity status`);
+    }
   }
 
   for (const behavior of contract.behaviors) {

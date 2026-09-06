@@ -14,7 +14,7 @@ Lima perilaku yang menjadi exit criterion spike sudah dapat ditangkap dan diveri
 - scroll reveal dengan reverse probe;
 - GSAP ScrollTrigger dengan `scrub: true`.
 
-Fase 0 telah selesai. Fase 1 sekarang membawa target registry, lifecycle lintas navigasi, reopenable session index, dan structured-data redaction ke natural capture. Behavior Contract schema 1.3.0 mencatat main frame, iframe bertingkat, cross-origin OOPIF, dedicated worker, histori navigation epoch, status collector, clock mapping, loss, serta ringkasan redaction. SQLite sidecar menyediakan query tanpa membuka website sumber.
+Fase 0 telah selesai. Fase 1 sekarang membawa target registry, lifecycle lintas navigasi, reopenable session index, structured-data redaction, budgeted evidence query, dan element identity lintas frame ke natural capture. Behavior Contract schema 1.4.0 mencatat target/navigation epoch, loss, redaction, locator candidates, bounds, dan ambiguity. SQLite sidecar menyediakan query tanpa membuka website sumber.
 
 Hasil terbaru tersedia di [artifacts/phase1/latest/behavior-contract.json](artifacts/phase1/latest/behavior-contract.json), [artifacts/phase1/latest/verification-reference.json](artifacts/phase1/latest/verification-reference.json), [artifacts/phase1/latest/verification-replica.json](artifacts/phase1/latest/verification-replica.json), dan [artifacts/phase1/latest/technical-probe-report.json](artifacts/phase1/latest/technical-probe-report.json). Kedua target verifikasi lulus 5/5 dan technical probe diagnostik lulus 10/10. Baseline Fase 0 tetap disimpan di `artifacts/phase0/latest`.
 
@@ -53,7 +53,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `src/verify.ts` menjalankan skenario held-out terhadap fixture baru.
 - `src/scenarios.ts` memvalidasi dan membaca suite skenario JSON berversi.
 - `src/browser-observer.ts` memasang page-world observer sebelum script fixture.
-- `schema/behavior-contract.schema.json` mendefinisikan kontrak JSON 1.3.0.
+- `schema/behavior-contract.schema.json` mendefinisikan kontrak JSON 1.4.0.
 - `schema/session-index.schema.json` mendefinisikan manifest checksum untuk reopenable index.
 - `fixtures/phase0` berisi ground-truth lokal dan GSAP yang disajikan dari dependency lokal.
 - `fixtures/replica` berisi implementasi independen tanpa GSAP dan tanpa selector sumber yang sama.
@@ -69,12 +69,14 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0007-reopenable-session-index.md` menetapkan desain SQLite sidecar sementara.
 - `docs/decisions/0008-structured-redaction-boundary.md` menetapkan redaction boundary dan batas visual.
 - `docs/decisions/0009-budgeted-evidence-query.md` menetapkan filter, cursor revision, serta record/byte budget.
+- `docs/decisions/0010-target-scoped-element-identity.md` menetapkan locator candidates dan ambiguity lintas epoch.
 - `docs/PHASE-0-REPORT.md` berisi hasil, keterbatasan, overhead, dan revisi scope.
 - `docs/PHASE-1-FOUNDATION-REPORT.md` berisi hasil irisan fondasi capture pertama.
 - `docs/PHASE-1-LIFECYCLE-REPORT.md` berisi hasil navigation epoch dan detach coverage.
 - `docs/PHASE-1-INDEX-REPORT.md` berisi hasil reopen, integrity verification, dan query index.
 - `docs/PHASE-1-REDACTION-REPORT.md` berisi kebijakan, bukti integrasi, dan residual risk redaction.
 - `docs/PHASE-1-QUERY-REPORT.md` berisi hasil evidence query dan pagination integrity.
+- `docs/PHASE-1-ELEMENT-REPORT.md` berisi hasil element registry lintas frame/navigation.
 
 ## Batas interpretasi
 

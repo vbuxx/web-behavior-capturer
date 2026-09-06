@@ -98,6 +98,16 @@ export async function buildSessionIndex(
         target_ref TEXT NOT NULL,
         payload_json TEXT NOT NULL
       );
+      CREATE TABLE elements (
+        element_id TEXT PRIMARY KEY,
+        target_id TEXT NOT NULL,
+        navigation_id TEXT NOT NULL,
+        data_wbc_id TEXT NOT NULL,
+        ambiguity_status TEXT NOT NULL,
+        preferred_strategy TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        FOREIGN KEY (target_id) REFERENCES targets(target_id)
+      );
       CREATE TABLE evidence (
         evidence_id TEXT PRIMARY KEY,
         path TEXT NOT NULL,
@@ -117,6 +127,7 @@ export async function buildSessionIndex(
       CREATE INDEX records_type_idx ON records(type);
       CREATE INDEX records_target_idx ON records(target_ref);
       CREATE INDEX behaviors_kind_idx ON behaviors(kind);
+      CREATE INDEX elements_target_idx ON elements(target_id);
       CREATE INDEX targets_navigation_idx ON targets(navigation_id);
     `);
 
@@ -126,6 +137,10 @@ export async function buildSessionIndex(
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertBehavior = database.prepare('INSERT INTO behaviors (behavior_id, kind, target_ref, payload_json) VALUES (?, ?, ?, ?)');
+    const insertElement = database.prepare(`
+      INSERT INTO elements (element_id, target_id, navigation_id, data_wbc_id, ambiguity_status, preferred_strategy, payload_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
     const insertEvidence = database.prepare('INSERT INTO evidence (evidence_id, path, media_type, sha256) VALUES (?, ?, ?, ?)');
     const insertRecord = database.prepare(`
       INSERT INTO records (record_id, source, type, target_ref, source_target_id, source_time, receive_time, payload_json)
@@ -151,6 +166,17 @@ export async function buildSessionIndex(
       }
       for (const behavior of contract.behaviors) {
         insertBehavior.run(behavior.behaviorId, behavior.kind, behavior.targetRef, JSON.stringify(behavior));
+      }
+      for (const element of contract.elements) {
+        insertElement.run(
+          element.id,
+          element.targetId,
+          element.navigationId,
+          element.dataWbcId,
+          element.ambiguity.status,
+          element.ambiguity.preferredStrategy,
+          JSON.stringify(element),
+        );
       }
       for (const evidence of contract.evidenceIndex) {
         insertEvidence.run(evidence.id, evidence.path, evidence.mediaType, evidence.sha256);
@@ -178,12 +204,13 @@ export async function buildSessionIndex(
   }
 
   const manifest: SessionIndexManifest = {
-    schemaVersion: '1.0.0',
+    schemaVersion: '1.1.0',
     generatedAt: new Date().toISOString(),
     database: { path: relative(packageDirectory, databasePath), sha256: await sha256(databasePath) },
     contract: { path: relative(packageDirectory, contractPath), sha256: await sha256(contractPath) },
     counts: {
       targets: contract.manifest.targetCoverage.length,
+      elements: contract.elements.length,
       behaviors: contract.behaviors.length,
       evidence: contract.evidenceIndex.length,
       records: records.length,
@@ -218,12 +245,14 @@ export async function inspectSessionPackage(packageDirectory: string): Promise<S
   try {
     const counts = {
       targets: readCount(database, 'targets'),
+      elements: readCount(database, 'elements'),
       behaviors: readCount(database, 'behaviors'),
       evidence: readCount(database, 'evidence'),
       records: readCount(database, 'records'),
     };
     if (JSON.stringify(counts) !== JSON.stringify(manifest.counts)) throw new Error('Session index counts do not match manifest');
     if (counts.targets !== contract.manifest.targetCoverage.length
+      || counts.elements !== contract.elements.length
       || counts.behaviors !== contract.behaviors.length
       || counts.evidence !== contract.evidenceIndex.length
       || counts.records !== contract.manifest.quality.recordCount) {

@@ -1,10 +1,10 @@
 {
   "schemaVersion": "1.0.0",
-  "verifiedAt": "2026-09-06T03:19:36.672Z",
-  "referenceSessionId": "bee7b1dd-d2ae-4073-a24b-3e329c189a4a",
+  "verifiedAt": "2026-09-06T03:38:30.514Z",
+  "referenceSessionId": "5d8b25a9-dd8f-472c-b8db-13cb83c44067",
   "scenarioSuiteId": "phase0-held-out-v1",
   "targetLabel": "reference",
-  "targetUrl": "http://127.0.0.1:59769/reference/",
+  "targetUrl": "http://127.0.0.1:61243/reference/",
   "heldOutConditions": [
     "Viewport 1100x740",
     "Scenario parameters loaded from versioned JSON",
@@ -43,7 +43,7 @@
       "metrics": {
         "heldOutExitMs": 105,
         "changedBeforeExit": true,
-        "interruptionTranslationX": 20.063,
+        "interruptionTranslationX": 20.06,
         "idleTranslationX": 0,
         "recoveredTranslationX": 0,
         "idleOpacity": 0.58,

@@ -14,7 +14,7 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
   try {
     const capture = await captureSession(temporaryDirectory);
     const contract = await validateContract(JSON.parse(await readFile(capture.contractPath, 'utf8')));
-    assert.equal(contract.schemaVersion, '1.3.0');
+    assert.equal(contract.schemaVersion, '1.4.0');
     assert.equal(contract.manifest.redaction.policyVersion, '1.0.0');
     assert.ok(contract.manifest.redaction.redactedValues > 0);
     assert.ok(contract.manifest.redaction.categories.includes('token'));
@@ -61,6 +61,19 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
     assert.ok((lifecycleA?.coverageEnd?.value ?? Infinity) <= (lifecycleA?.detachedAt?.value ?? 0));
     assert.ok((lifecycleB?.coverageEnd?.value ?? Infinity) <= (lifecycleB?.detachedAt?.value ?? 0));
 
+    assert.ok(contract.elements.length > 5);
+    assert.ok(contract.elements.every((element) => targets.some((target) => target.targetId === element.targetId)));
+    assert.ok(contract.elements.every((element) => (
+      targets.find((target) => target.targetId === element.targetId)?.navigationId === element.navigationId
+    )));
+    assert.ok(contract.elements.some((element) => element.targetId === lifecycleA?.targetId));
+    assert.ok(contract.elements.some((element) => element.targetId === lifecycleB?.targetId));
+    const ambiguousElements = contract.elements.filter((element) => element.dataWbcId === 'ambiguous-action');
+    assert.equal(ambiguousElements.length, 2);
+    assert.ok(ambiguousElements.every((element) => element.ambiguity.status === 'ambiguous'));
+    assert.ok(ambiguousElements.every((element) => element.ambiguity.matchCount === 2));
+    assert.deepEqual(ambiguousElements.map((element) => element.instanceOrdinal), [1, 2]);
+
     const evidenceIds = new Set(contract.evidenceIndex.map((entry) => entry.id));
     for (const behavior of contract.behaviors) {
       assert.ok(behavior.provenance.evidenceRefs.length > 0);
@@ -98,6 +111,7 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
     assert.equal(inspection.integrity, 'verified');
     assert.deepEqual(inspection.counts, {
       targets: contract.manifest.targetCoverage.length,
+      elements: contract.elements.length,
       behaviors: contract.behaviors.length,
       evidence: contract.evidenceIndex.length,
       records: contract.manifest.quality.recordCount,

@@ -53,10 +53,24 @@ export interface EvidenceRecord {
 export interface ElementRef {
   id: string;
   navigationId: string;
-  frame: 'main';
+  targetId: string;
+  frame: 'main' | 'iframe';
+  coordinateSpace: 'document';
   selector: string;
   dataWbcId: string;
+  instanceOrdinal: number;
   bounds: { x: number; y: number; width: number; height: number };
+  locatorCandidates: Array<{
+    strategy: 'data_attribute' | 'id' | 'role';
+    value: string;
+    score: number;
+    matchCount: number;
+  }>;
+  ambiguity: {
+    status: 'unique' | 'ambiguous';
+    preferredStrategy: 'data_attribute' | 'id' | 'role';
+    matchCount: number;
+  };
 }
 
 export interface TimeTimeline {
@@ -127,7 +141,7 @@ export interface Behavior {
 
 export interface CaptureManifest {
   productVersion: string;
-  schemaVersion: '1.3.0';
+  schemaVersion: '1.4.0';
   sessionId: string;
   navigationId: string;
   generatedAt: string;
@@ -173,7 +187,7 @@ export interface CaptureManifest {
 }
 
 export interface ContractPackage {
-  schemaVersion: '1.3.0';
+  schemaVersion: '1.4.0';
   manifest: CaptureManifest;
   elements: ElementRef[];
   behaviors: Behavior[];
@@ -207,9 +221,9 @@ export interface VerificationReport {
 }
 
 export interface SessionIndexManifest {
-  schemaVersion: '1.0.0';
+  schemaVersion: '1.1.0';
   generatedAt: string;
   database: { path: string; sha256: string };
   contract: { path: string; sha256: string };
-  counts: { targets: number; behaviors: number; evidence: number; records: number };
+  counts: { targets: number; elements: number; behaviors: number; evidence: number; records: number };
 }

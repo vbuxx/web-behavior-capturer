@@ -1,10 +1,10 @@
 {
   "schemaVersion": "1.0.0",
-  "verifiedAt": "2026-09-06T03:19:48.033Z",
-  "referenceSessionId": "bee7b1dd-d2ae-4073-a24b-3e329c189a4a",
+  "verifiedAt": "2026-09-06T03:38:43.035Z",
+  "referenceSessionId": "5d8b25a9-dd8f-472c-b8db-13cb83c44067",
   "scenarioSuiteId": "phase0-held-out-v1",
   "targetLabel": "replica",
-  "targetUrl": "http://127.0.0.1:59776/replica/",
+  "targetUrl": "http://127.0.0.1:61253/replica/",
   "heldOutConditions": [
     "Viewport 1100x740",
     "Scenario parameters loaded from versioned JSON",
@@ -44,7 +44,7 @@
       "metrics": {
         "heldOutExitMs": 105,
         "changedBeforeExit": true,
-        "interruptionTranslationX": 29.498,
+        "interruptionTranslationX": 29.531,
         "idleTranslationX": 0,
         "recoveredTranslationX": 0,
         "idleOpacity": 0.58,

@@ -16,6 +16,7 @@ Satu `Frame` Playwright dapat bertahan ketika dokumennya berganti. Jika registry
 5. Archived target selalu `partial`. Nilai ini tidak dinaikkan menjadi `full` hanya karena checkpoint berada dekat dengan event.
 6. Semantic validator menolak duplicate target/navigation ID, parent yang hilang, active target dengan end boundary, archived target tanpa boundary/gap, dan coverage end setelah detach.
 7. Rekam lifecycle request sebagai evidence. Proses navigasi tetap natural—tanpa pause, seek, atau clock modification—tetapi skenarionya dikendalikan agar hasil dapat diuji deterministik.
+8. Pada navigation-race probe, nilai node lama terhadap execution context aktif. `isConnected` di handle lama tidak cukup karena BFCache dapat mempertahankan dokumen lama dalam keadaan connected tetapi tidak aktif.
 
 ## Consequences
 

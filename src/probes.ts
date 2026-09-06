@@ -175,7 +175,12 @@ export async function runTechnicalProbes(outputFile?: string): Promise<Technical
     const finalEpoch = await racePage.locator('body').getAttribute('data-navigation-epoch') ?? 'missing';
     let oldNodeInvalidated = false;
     try {
-      oldNodeInvalidated = oldNode ? !(await oldNode.evaluate((element) => element.isConnected)) : false;
+      oldNodeInvalidated = oldNode
+        ? await racePage.evaluate(
+          (before) => before !== document.querySelector('[data-wbc-id="navigation-target"]'),
+          oldNode,
+        )
+        : false;
     } catch {
       oldNodeInvalidated = true;
     }

@@ -1,6 +1,6 @@
 import type { Frame, Page, Worker } from 'playwright';
 import { readPageObserver, type PageObserverState } from './browser-observer.js';
-import type { CaptureTargetKind, EvidenceRecord, TargetCoverage } from './types.js';
+import type { CaptureTargetKind, ElementRef, EvidenceRecord, TargetCoverage } from './types.js';
 
 interface WorkerObserverState {
   records: Array<{
@@ -24,6 +24,7 @@ interface RealmClock {
 interface RealmSnapshot<T> {
   observer?: T;
   clock?: RealmClock;
+  elements?: Array<Pick<ElementRef, 'dataWbcId' | 'instanceOrdinal' | 'bounds' | 'locatorCandidates' | 'ambiguity'>>;
   checkpointAt: number;
   hostBefore: number;
   hostReceiveTime: number;
@@ -71,6 +72,7 @@ export interface CollectedTargetRecord {
 export interface TargetRegistrySnapshot {
   coverage: TargetCoverage[];
   records: CollectedTargetRecord[];
+  elements: ElementRef[];
 }
 
 function clockMapping(snapshot: RealmSnapshot<unknown>): NonNullable<TargetCoverage['clockMapping']> | undefined {
@@ -252,6 +254,7 @@ export class TargetRegistry {
   async #snapshotFrame(registered: RegisteredFrame): Promise<void> {
     let observer: PageObserverState | undefined;
     let clock: RealmClock | undefined;
+    let elements: RealmSnapshot<PageObserverState>['elements'];
     let failure: string | undefined;
     try {
       observer = await readPageObserver(registered.frame);
@@ -264,12 +267,75 @@ export class TargetRegistry {
     } catch (error) {
       failure ??= error instanceof Error ? error.message : String(error);
     }
+    const hostReceiveTime = Date.now();
+    try {
+      elements = await registered.frame.locator('[data-wbc-id]').evaluateAll((matches) => {
+        const inferRole = (element: Element): string | null => {
+          const explicit = element.getAttribute('role');
+          if (explicit) return explicit;
+          if (element instanceof HTMLButtonElement) return 'button';
+          if (element instanceof HTMLAnchorElement && element.hasAttribute('href')) return 'link';
+          if (element instanceof HTMLInputElement) return element.type === 'checkbox' ? 'checkbox' : 'textbox';
+          return null;
+        };
+        return matches.map((element) => {
+          const htmlElement = element as HTMLElement;
+          const dataWbcId = htmlElement.dataset.wbcId ?? '';
+          const dataSelector = `[data-wbc-id="${CSS.escape(dataWbcId)}"]`;
+          const duplicateElements = matches.filter((candidate) => (candidate as HTMLElement).dataset.wbcId === dataWbcId);
+          const candidates: Array<{
+            strategy: 'data_attribute' | 'id' | 'role';
+            value: string;
+            score: number;
+            matchCount: number;
+          }> = [{
+            strategy: 'data_attribute',
+            value: dataSelector,
+            score: 1,
+            matchCount: document.querySelectorAll(dataSelector).length,
+          }];
+          if (htmlElement.id) {
+            const idSelector = `#${CSS.escape(htmlElement.id)}`;
+            candidates.push({ strategy: 'id', value: idSelector, score: 0.95, matchCount: document.querySelectorAll(idSelector).length });
+          }
+          const role = inferRole(element);
+          if (role) {
+            candidates.push({
+              strategy: 'role',
+              value: role,
+              score: 0.7,
+              matchCount: matches.filter((candidate) => inferRole(candidate) === role).length,
+            });
+          }
+          candidates.sort((left, right) => {
+            const uniqueDelta = Number(right.matchCount === 1) - Number(left.matchCount === 1);
+            return uniqueDelta || right.score - left.score;
+          });
+          const preferred = candidates[0]!;
+          const rect = element.getBoundingClientRect();
+          return {
+            dataWbcId,
+            instanceOrdinal: duplicateElements.indexOf(element) + 1,
+            bounds: { x: rect.x + scrollX, y: rect.y + scrollY, width: rect.width, height: rect.height },
+            locatorCandidates: candidates,
+            ambiguity: {
+              status: preferred.matchCount === 1 ? 'unique' as const : 'ambiguous' as const,
+              preferredStrategy: preferred.strategy,
+              matchCount: preferred.matchCount,
+            },
+          };
+        });
+      });
+    } catch (error) {
+      failure ??= error instanceof Error ? error.message : String(error);
+    }
     registered.snapshot = {
       ...(observer ? { observer } : {}),
       ...(clock ? { clock } : {}),
+      ...(elements ? { elements } : {}),
       checkpointAt: Date.now(),
       hostBefore,
-      hostReceiveTime: Date.now(),
+      hostReceiveTime,
       ...(failure ? { failure } : {}),
     };
   }
@@ -320,11 +386,26 @@ export class TargetRegistry {
 
     const coverage: TargetCoverage[] = [];
     const records: CollectedTargetRecord[] = [];
+    const elements: ElementRef[] = [];
     const mainUrl = this.#frameHistory.find((entry) => entry.logicalId === 'main' && entry.lifecycleStatus === 'active')?.url
       ?? this.#page.mainFrame().url();
 
     for (const registered of this.#frameHistory) {
       const observer = registered.snapshot?.observer;
+      for (const observed of registered.snapshot?.elements ?? []) {
+        const dataCandidate = observed.locatorCandidates.find((candidate) => candidate.strategy === 'data_attribute');
+        const needsOrdinal = (dataCandidate?.matchCount ?? 0) > 1;
+        const elementId = `${registered.targetId}:${observed.dataWbcId}${needsOrdinal ? `:${observed.instanceOrdinal}` : ''}`;
+        elements.push({
+          id: elementId,
+          navigationId: registered.navigationId,
+          targetId: registered.targetId,
+          frame: registered.logicalId === 'main' ? 'main' : 'iframe',
+          coordinateSpace: 'document',
+          selector: observed.locatorCandidates[0]!.value,
+          ...observed,
+        });
+      }
       if (observer) {
         for (const raw of observer.records) {
           const normalizedTargetRef = raw.targetRef?.replace('nav-1:main', registered.targetId);
@@ -412,6 +493,6 @@ export class TargetRegistry {
       });
     }
 
-    return { coverage, records };
+    return { coverage, records, elements };
   }
 }

@@ -1,5 +1,7 @@
 # Phase 1 Query Report — Budgeted Evidence Retrieval
 
+Status: completed. Cross-target element identity continues in [PHASE-1-ELEMENT-REPORT.md](PHASE-1-ELEMENT-REPORT.md).
+
 ## Outcome
 
 CLI sekarang menyediakan evidence retrieval dari verified session package. Hasil dapat difilter berdasarkan source target, event type, target reference, dan inclusive source-time range. Setiap page memiliki record limit, byte budget, immutable revision, dan opaque continuation cursor.

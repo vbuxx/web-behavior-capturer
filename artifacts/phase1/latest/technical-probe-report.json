@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
-  "probeId": "ba6d25b6-98ca-40ec-b6b3-3b3e57677da7",
-  "generatedAt": "2026-09-06T03:19:51.559Z",
+  "probeId": "1caacbd3-31d5-4ec8-a65c-d3a96bb1bc55",
+  "generatedAt": "2026-09-06T03:39:34.395Z",
   "browserVersion": "140.0.7339.16",
   "mode": "diagnostic",
   "shortAnimation": {
@@ -16,22 +16,22 @@
     {
       "target": "main_frame",
       "status": "supported",
-      "evidence": "http://127.0.0.1:59782/probes/"
+      "evidence": "http://127.0.0.1:61312/probes/"
     },
     {
       "target": "same_origin_iframe",
       "status": "supported",
-      "evidence": "http://127.0.0.1:59782/probe-frame/"
+      "evidence": "http://127.0.0.1:61312/probe-frame/"
     },
     {
       "target": "cross_origin_iframe",
       "status": "supported",
-      "evidence": "http://localhost:59781/cross-origin-frame/"
+      "evidence": "http://localhost:61311/cross-origin-frame/"
     },
     {
       "target": "dedicated_worker",
       "status": "supported",
-      "evidence": "http://127.0.0.1:59782/probe-worker.js"
+      "evidence": "http://127.0.0.1:61312/probe-worker.js"
     }
   ],
   "identity": {
@@ -43,7 +43,7 @@
   },
   "clockMapping": {
     "method": "performance.timeOrigin + performance.now compared with Date.now",
-    "maxAbsoluteErrorMs": 0.9,
+    "maxAbsoluteErrorMs": 1,
     "samples": 10,
     "status": "passed"
   },
@@ -58,7 +58,7 @@
     "status": "passed"
   },
   "lateAttach": {
-    "attachAtMs": 151.2,
+    "attachAtMs": 149.7,
     "activeAnimationsAtAttach": 0,
     "lifecycleEventsBeforeAttach": 0,
     "gap": "page_load_to_attach",
@@ -67,8 +67,8 @@
   },
   "navigationRace": {
     "observedUrls": [
-      "http://127.0.0.1:59782/race-start/",
-      "http://127.0.0.1:59782/race-end/"
+      "http://127.0.0.1:61312/race-start/",
+      "http://127.0.0.1:61312/race-end/"
     ],
     "startObserved": true,
     "endObserved": true,
