@@ -20,6 +20,7 @@
     "cleanup:staging": "tsx src/cli.ts cleanup-staging",
     "benchmark:failure": "tsx src/cli.ts failure-benchmark",
     "benchmark:corruption": "tsx src/cli.ts corruption-benchmark",
+    "rotate:package": "tsx src/cli.ts rotate-package",
     "verify": "tsx src/cli.ts verify",
     "verify:replica": "tsx src/cli.ts verify --target replica",
     "probe": "tsx src/cli.ts probe",
