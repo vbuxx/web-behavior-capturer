@@ -18,6 +18,10 @@ interface ConditionSummary {
   status: 'measured' | 'unavailable';
   agentSuccess: AgentSuccess;
   verifierSuccess?: number;
+  agentSuccessNumerator?: number;
+  agentSuccessDenominator?: number;
+  unsupportedRuns?: number;
+  variance?: number;
   reason?: string;
 }
 
@@ -53,6 +57,9 @@ export interface EvaluationReport {
       outputTokens: number | null;
       evidenceBytes: number;
       bundleSha256: string;
+      extractionAccuracy: number | null;
+      behaviorEquivalence: number | null;
+      agentSuccess: boolean | null;
       verifierStatus: 'passed' | 'failed' | 'unsupported' | 'not_run';
       verifierPassed: number | null;
       verifierFailed: number | null;
@@ -230,7 +237,7 @@ export async function evaluatePhase2(
   const seed = options.seed ?? 1;
   const startingRef = options.startingRef ?? await resolveStartingRef();
   if (options.agentCommand) {
-    const tasks = taskSpec.tasks.filter((task) => !options.taskId || task.id === options.taskId);
+      const tasks = taskSpec.tasks.filter((task) => !options.taskId || task.id === options.taskId);
     if (tasks.length === 0) throw new Error(`Unknown evaluation task: ${options.taskId}`);
     const conditions: EvaluationCondition[] = options.condition ? [options.condition] : ['screenshot', 'trace', 'wbc'];
     const ordered = tasks.flatMap((task) => conditions.map((condition) => ({ task, condition }))).sort((left, right) => {
@@ -249,9 +256,11 @@ export async function evaluatePhase2(
           const prompt = [`WBC evaluation task ${task.id}.`, `Condition: ${condition}.`, 'Work only in the provided workspace and use only .wbc/evidence for observation.', 'Do not search for, open, or recreate raw event logs, credentials, cookies, headers, or response bodies.', `Evidence byte budget: ${evidenceByteBudget}.`, 'Implement the requested behavior in app/ and leave the workspace ready for the held-out verifier.', 'Return a concise final summary without copying evidence contents into the response.'].join('\n');
           const run = await runAgentCommand({ command: options.agentCommand, cwd: workspace, prompt, timeoutMs });
           const verifier = run.status === 'completed' ? await verifyAgentWorkspace(resolve(packageRoot, 'behavior-contract.json'), workspace, task) : { status: 'not_run' as const, passed: null, failed: null, error: `agent_${run.status}` };
-          agentRuns.push({ condition, taskId: task.id, repetition, status: run.status, durationMs: run.durationMs, inputTokens: run.inputTokens, outputTokens: run.outputTokens, evidenceBytes: bundle.evidenceBytes, bundleSha256, verifierStatus: verifier.status, verifierPassed: verifier.passed, verifierFailed: verifier.failed, ...(verifier.error ? { errorProvenance: verifier.error } : {}) });
+          const extractionAccuracy = task.behaviorId ? (contract.behaviors.some((behavior) => behavior.behaviorId === task.behaviorId) ? 1 : 0) : null;
+          const behaviorEquivalence = verifier.passed !== null && verifier.failed !== null && verifier.passed + verifier.failed > 0 ? verifier.passed / (verifier.passed + verifier.failed) : null;
+          agentRuns.push({ condition, taskId: task.id, repetition, status: run.status, durationMs: run.durationMs, inputTokens: run.inputTokens, outputTokens: run.outputTokens, evidenceBytes: bundle.evidenceBytes, bundleSha256, extractionAccuracy, behaviorEquivalence, agentSuccess: run.status === 'completed' && verifier.status === 'passed', verifierStatus: verifier.status, verifierPassed: verifier.passed, verifierFailed: verifier.failed, ...(verifier.error ? { errorProvenance: verifier.error } : {}) });
         } catch (error) {
-          agentRuns.push({ condition, taskId: task.id, repetition, status: 'failed', durationMs: 0, inputTokens: null, outputTokens: null, evidenceBytes: 0, bundleSha256, verifierStatus: 'not_run', verifierPassed: null, verifierFailed: null, errorProvenance: error instanceof Error ? error.message : String(error) });
+          agentRuns.push({ condition, taskId: task.id, repetition, status: 'failed', durationMs: 0, inputTokens: null, outputTokens: null, evidenceBytes: 0, bundleSha256, extractionAccuracy: null, behaviorEquivalence: null, agentSuccess: false, verifierStatus: 'not_run', verifierPassed: null, verifierFailed: null, errorProvenance: error instanceof Error ? error.message : String(error) });
         } finally {
           if (workspace) await rm(workspace, { recursive: true, force: true });
         }
@@ -264,7 +273,10 @@ export async function evaluatePhase2(
     if (runs.length === 0) return { status: 'unavailable', agentSuccess: 'not_measured', reason: `Condition ${condition} was not selected for this run.` };
     const success = runs.filter((run) => run.status === 'completed' && run.verifierStatus === 'passed').length;
     const verifier = runs.filter((run) => run.verifierStatus === 'passed').length;
-    return { status: 'measured', agentSuccess: runs.length === 0 ? 'not_measured' : success / runs.length, ...(runs.length > 0 ? { verifierSuccess: verifier / runs.length } : {}) };
+    const values = runs.map((run) => run.status === 'completed' && run.verifierStatus === 'passed' ? 1 : 0);
+    const mean = values.length > 0 ? values.reduce((sum: number, value) => sum + value, 0) / values.length : 0;
+    const variance = values.length > 1 ? values.reduce((sum: number, value) => sum + ((value - mean) ** 2), 0) / values.length : 0;
+    return { status: 'measured', agentSuccess: runs.length === 0 ? 'not_measured' : success / runs.length, agentSuccessNumerator: success, agentSuccessDenominator: runs.length, unsupportedRuns: runs.filter((run) => run.verifierStatus === 'unsupported').length, variance, ...(runs.length > 0 ? { verifierSuccess: verifier / runs.length } : {}) };
   };
   const result: EvaluationReport = {
     schemaVersion: '1.2.0', generatedAt: new Date().toISOString(), packagePath: packageRoot, repetitions,
