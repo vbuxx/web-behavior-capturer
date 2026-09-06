@@ -22,6 +22,8 @@ Run dengan parallelism 2 dan 1 cycle:
 
 Kedua session berjalan bersamaan, tetap memiliki package terpisah, dan dapat dibuka kembali tanpa checksum atau schema failure.
 
+Profil lebih berat dengan parallelism 4 dan 2 cycles juga lulus: 8/8 session verified, total wall time 60,807 detik, peak host RSS 168,362 MB, peak Node heap 98,526 MB, dan peak open file descriptors 74. Tidak ada dropped record atau failure. Perbedaan record antar-session berasal dari timing natural fixture, bukan cross-session contamination.
+
 Regression suite dijalankan serial (`--test-concurrency=1`) karena capture/browser-heavy tests yang berjalan paralel dapat membuat diagnostic timing probe dan review server timeout akibat resource contention. Ini adalah batas test harness, bukan concurrency limit pada reliability benchmark.
 
 ## Boundary
@@ -30,4 +32,4 @@ Ini membuktikan isolation dan repeatability pada dua capture Chromium lokal. Bel
 
 ## Next Gate
 
-Tambahkan crash/lifecycle interruption probe, capture session beberapa menit, dan parallelism 3–4. Ukur peak RSS host, file descriptor count, serta recovery semantics sebelum service lifecycle dan MCP job API.
+Tambahkan crash/lifecycle interruption probe, capture session beberapa menit, serta recovery semantics. Resource ceiling pada parallelism 4 sudah memiliki baseline; perlu limit/alert yang eksplisit sebelum service lifecycle dan MCP job API.

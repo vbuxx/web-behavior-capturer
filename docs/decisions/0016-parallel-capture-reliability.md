@@ -13,4 +13,4 @@ Tambahkan reliability benchmark dengan temporary output directory per `(cycle, s
 
 ## Consequence
 
-Parallelism 2 lulus dengan dua package verified, lima behavior per package, dan zero loss. Regression test browser-heavy dijalankan serial untuk menghindari resource contention pada diagnostic timing probe; ini tidak membatasi benchmark parallelism. Crash recovery, host resource ceiling, dan session cancellation masih menjadi gate sebelum job-oriented service/MCP.
+Parallelism 2 lulus dengan dua package verified, lima behavior per package, dan zero loss. Profil parallelism 4 × 2 cycles menghasilkan 8/8 package verified, peak RSS host 168,362 MB, peak heap 98,526 MB, dan peak 74 file descriptors. Regression test browser-heavy dijalankan serial untuk menghindari resource contention pada diagnostic timing probe; ini tidak membatasi benchmark parallelism. Crash recovery dan session cancellation masih menjadi gate sebelum job-oriented service/MCP.
