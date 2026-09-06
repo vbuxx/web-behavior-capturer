@@ -12,9 +12,15 @@ test('captures nested scroller progress and reverse input as explicit container 
     await installPageObserver(context);
     const page = await context.newPage();
     await page.goto(`${server.url}/nested-scroller/`, { waitUntil: 'load' });
-    await page.locator('[data-wbc-id="nested-scroller"]').evaluate((node) => { (node as HTMLElement).scrollTop = 220; });
+    await page.locator('[data-wbc-id="nested-scroller"]').evaluate((node) => {
+      (node as HTMLElement).scrollTop = 220;
+      node.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
     await page.waitForTimeout(30);
-    await page.locator('[data-wbc-id="nested-scroller"]').evaluate((node) => { (node as HTMLElement).scrollTop = 40; });
+    await page.locator('[data-wbc-id="nested-scroller"]').evaluate((node) => {
+      (node as HTMLElement).scrollTop = 40;
+      node.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
     await page.waitForTimeout(30);
     const state = await readPageObserver(page);
     const scrolls = state.records.filter((record) => record.type === 'scroll');
