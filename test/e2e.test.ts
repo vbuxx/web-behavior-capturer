@@ -18,7 +18,10 @@ test('captures and verifies all Phase 0 behaviors with traceable evidence', { ti
     const stagingOrphans = (await readdir(dirname(temporaryDirectory))).filter((entry) => entry.startsWith(`${basename(temporaryDirectory)}.staging-`));
     assert.equal(stagingOrphans.length, 0);
     const contract = await validateContract(JSON.parse(await readFile(capture.contractPath, 'utf8')));
-    assert.equal(contract.schemaVersion, '1.5.0');
+    assert.equal(contract.schemaVersion, '1.6.0');
+    assert.equal(contract.manifest.schemaVersion, '1.6.0');
+    assert.equal(contract.manifest.status, 'completed');
+    assert.equal(contract.manifest.quality.streaming?.mode, 'buffered');
     assert.equal(contract.manifest.redaction.policyVersion, '1.0.0');
     assert.ok(contract.manifest.redaction.redactedValues > 0);
     assert.ok(contract.manifest.redaction.categories.includes('token'));

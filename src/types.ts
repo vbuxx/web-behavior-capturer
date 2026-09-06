@@ -1,4 +1,6 @@
 export type CapabilityStatus = 'supported' | 'unavailable' | 'failed' | 'not_attempted';
+export type CaptureSchemaVersion = '1.5.0' | '1.6.0';
+export type CaptureSessionState = 'running' | 'stopping' | 'finalizing' | 'completed' | 'cancelled' | 'failed';
 export type ProvenanceStatus = 'extracted' | 'observed' | 'inferred' | 'unknown';
 export type EdgeClass = 'direct' | 'experiment_supported' | 'correlated' | 'unknown';
 export type BehaviorKind =
@@ -153,10 +155,12 @@ export interface Behavior {
 
 export interface CaptureManifest {
   productVersion: string;
-  schemaVersion: '1.5.0';
+  schemaVersion: CaptureSchemaVersion;
   sessionId: string;
   navigationId: string;
   generatedAt: string;
+  status?: CaptureSessionState;
+  resumedFromSessionId?: string;
   source: {
     url: string;
     fixture: 'phase0';
@@ -194,12 +198,25 @@ export interface CaptureManifest {
       degradationPercent: number;
       sampleCount: number;
     };
+    streaming?: {
+      mode: 'buffered' | 'host_batch';
+      flushIntervalMs: number;
+      batchSize: number;
+      queueCapacity: number;
+      coalescedRecordTypes: string[];
+    };
+  };
+  visualRedaction?: {
+    policyVersion: '1.0.0';
+    maskedScreenshots: number;
+    maskedSelectors: string[];
+    unmaskedScreenshots: number;
   };
   gaps: string[];
 }
 
 export interface ContractPackage {
-  schemaVersion: '1.5.0';
+  schemaVersion: CaptureSchemaVersion;
   manifest: CaptureManifest;
   elements: ElementRef[];
   behaviors: Behavior[];

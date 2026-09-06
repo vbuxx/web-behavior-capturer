@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://wbc.local/schema/behavior-contract-1.5.0.json",
+  "$id": "https://wbc.local/schema/behavior-contract-1.6.0.json",
   "title": "Website Behavior Capture Contract Package",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "manifest", "elements", "behaviors", "evidenceIndex"],
   "properties": {
-    "schemaVersion": { "const": "1.5.0" },
+    "schemaVersion": { "enum": ["1.5.0", "1.6.0"] },
     "manifest": { "$ref": "#/$defs/manifest" },
     "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } },
     "behaviors": {
@@ -106,10 +106,12 @@
       "required": ["productVersion", "schemaVersion", "sessionId", "navigationId", "generatedAt", "source", "environment", "captureMode", "capabilities", "targetCoverage", "redaction", "quality", "gaps"],
       "properties": {
         "productVersion": { "type": "string" },
-        "schemaVersion": { "const": "1.5.0" },
+        "schemaVersion": { "enum": ["1.5.0", "1.6.0"] },
         "sessionId": { "type": "string" },
         "navigationId": { "type": "string" },
         "generatedAt": { "type": "string", "format": "date-time" },
+        "status": { "enum": ["running", "stopping", "finalizing", "completed", "cancelled", "failed"] },
+        "resumedFromSessionId": { "type": "string", "minLength": 1 },
         "source": { "type": "object" },
         "environment": { "type": "object" },
         "captureMode": { "const": "natural" },
@@ -145,7 +147,34 @@
             }
           }
         },
-        "quality": { "type": "object" },
+        "quality": {
+          "type": "object",
+          "properties": {
+            "streaming": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "flushIntervalMs", "batchSize", "queueCapacity", "coalescedRecordTypes"],
+              "properties": {
+                "mode": { "enum": ["buffered", "host_batch"] },
+                "flushIntervalMs": { "type": "number", "minimum": 0 },
+                "batchSize": { "type": "integer", "minimum": 1 },
+                "queueCapacity": { "type": "integer", "minimum": 1 },
+                "coalescedRecordTypes": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "visualRedaction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["policyVersion", "maskedScreenshots", "maskedSelectors", "unmaskedScreenshots"],
+          "properties": {
+            "policyVersion": { "const": "1.0.0" },
+            "maskedScreenshots": { "type": "integer", "minimum": 0 },
+            "maskedSelectors": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+            "unmaskedScreenshots": { "type": "integer", "minimum": 0 }
+          }
+        },
         "gaps": { "type": "array", "items": { "type": "string" } }
       }
     },

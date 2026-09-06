@@ -72,7 +72,7 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `src/verify.ts` menjalankan skenario held-out terhadap fixture baru.
 - `src/scenarios.ts` memvalidasi dan membaca suite skenario JSON berversi.
 - `src/browser-observer.ts` memasang page-world observer sebelum script fixture.
-- `schema/behavior-contract.schema.json` mendefinisikan kontrak JSON 1.5.0.
+- `schema/behavior-contract.schema.json` mendefinisikan kontrak JSON 1.6.0 yang tetap menerima package 1.5.0 secara additive.
 - `schema/session-index.schema.json` mendefinisikan manifest checksum untuk reopenable index.
 - `fixtures/phase0` berisi ground-truth lokal dan GSAP yang disajikan dari dependency lokal.
 - `fixtures/replica` berisi implementasi independen tanpa GSAP, selector sumber, atau shared `data-wbc-id`.
@@ -123,9 +123,11 @@ pnpm run capture -- --out .wbc/loss-probe --max-records 8
 - `docs/decisions/0023-archive-retention.md` menetapkan pruning eksplisit untuk archive package.
 - `docs/decisions/0024-cross-filesystem-rotation.md` menetapkan copy + verify + remove fallback untuk archive lintas filesystem.
 - `docs/PHASE-1-ROTATION-STAGING-REPORT.md` berisi janitor age-bounded untuk orphan rotation staging.
+- `docs/PHASE-1-SCHEMA-LIFECYCLE-REPORT.md` berisi compatibility schema 1.6 dan cancellation state gate.
 - `docs/decisions/0025-rotation-staging-recovery.md` menetapkan cleanup terpisah dari archive retention.
 - `src/rotation-recovery.ts` menyimpan marker rotation berversi dan recovery dry-run/apply; source hanya dihapus setelah archive identity dan checksum terverifikasi.
 - `docs/decisions/0018-writer-failure-recovery.md` menetapkan fail-closed behavior untuk error normal saat finalisasi.
+- `docs/decisions/0027-schema-1-6-lifecycle-state.md` menetapkan additive schema 1.6 dan state cancellation fail-closed.
 - `src/staging.ts` menyediakan janitor age-bounded untuk orphan staging directory setelah hard crash.
 
 ## Batas interpretasi

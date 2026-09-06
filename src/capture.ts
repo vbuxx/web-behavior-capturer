@@ -10,6 +10,7 @@ import { Redactor } from './redaction.js';
 import { validateContract } from './validate.js';
 import type {
   Behavior,
+  CaptureSessionState,
   ContractPackage,
   EvidenceRecord,
   StyleSample,
@@ -517,12 +518,34 @@ export interface CaptureResult {
 export interface CaptureOptions {
   maxPageRecords?: number;
   overheadRuns?: number;
+  signal?: AbortSignal;
+  onStateChange?: (state: CaptureSessionState) => void;
+}
+
+export class CaptureCancelledError extends Error {
+  constructor() {
+    super('Capture cancelled');
+    this.name = 'CaptureCancelledError';
+  }
 }
 
 export async function captureSession(outputDirectory: string, options: CaptureOptions = {}): Promise<CaptureResult> {
   const absoluteOutput = resolve(outputDirectory);
   const stagingDirectory = `${absoluteOutput}.staging-${randomUUID()}`;
   let promoted = false;
+  let state: CaptureSessionState = 'running';
+  const setState = (next: CaptureSessionState): void => {
+    state = next;
+    options.onStateChange?.(next);
+  };
+  const throwIfCancelled = (): void => {
+    if (options.signal?.aborted) {
+      setState('stopping');
+      setState('cancelled');
+      throw new CaptureCancelledError();
+    }
+  };
+  throwIfCancelled();
   const evidenceDirectory = join(stagingDirectory, 'evidence');
   const visualDirectory = join(evidenceDirectory, 'visual');
   await mkdir(visualDirectory, { recursive: true });
@@ -532,6 +555,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
   const redactor = new Redactor();
   const recorder = new EvidenceRecorder(redactor);
   try {
+    throwIfCancelled();
     const overhead = await benchmarkObserver(browser, server.url, options.overheadRuns ?? 3);
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
@@ -559,6 +583,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     }
 
     await page.goto(server.url, { waitUntil: 'networkidle' });
+    throwIfCancelled();
     await page.waitForFunction(() => (window as unknown as { __WBC_FIXTURE__?: { ready: boolean } }).__WBC_FIXTURE__?.ready === true);
     const behaviors = [
       await captureHover(page, recorder, visualDirectory),
@@ -567,6 +592,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
       await captureScrollReveal(page, recorder, visualDirectory),
       await captureGsapScrub(page, recorder, visualDirectory),
     ];
+    throwIfCancelled();
 
     await targetRegistry.checkpoint();
     const lifecycleNavigation = page.waitForEvent('framenavigated', {
@@ -621,14 +647,17 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     const degradation = baselineP95 === 0 ? 0 : ((captureP95 - baselineP95) / baselineP95) * 100;
     const sessionId = randomUUID();
     const browserVersion = browser.version();
+    setState('finalizing');
+    throwIfCancelled();
     const contract: ContractPackage = {
-      schemaVersion: '1.5.0',
+      schemaVersion: '1.6.0',
       manifest: {
         productVersion: '0.5.0-phase1',
-        schemaVersion: '1.5.0',
+        schemaVersion: '1.6.0',
         sessionId,
         navigationId: 'nav-1',
         generatedAt: new Date().toISOString(),
+        status: 'completed',
         source: { url: redactor.redact(server.url, 'url'), fixture: 'phase0' },
         environment: {
           browserName: 'chromium', browserVersion, platform: process.platform,
@@ -669,6 +698,19 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
             degradationPercent: round(degradation),
             sampleCount: overhead.sampleCount,
           },
+          streaming: {
+            mode: 'buffered',
+            flushIntervalMs: 50,
+            batchSize: 128,
+            queueCapacity: options.maxPageRecords ?? 10_000,
+            coalescedRecordTypes: [],
+          },
+        },
+        visualRedaction: {
+          policyVersion: '1.0.0',
+          maskedScreenshots: 0,
+          maskedSelectors: [],
+          unmaskedScreenshots: recorder.files.filter((file) => file.mediaType === 'image/png').length,
         },
         gaps: [
           'Only one deterministic local route is covered.',
@@ -685,6 +727,8 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           'Locator candidates exclude visible text; ordinal identity for fully ambiguous elements may drift after DOM reordering.',
           'Independent structural resolution is heuristic; major layout reordering or many visually identical candidates can be rejected as ambiguous.',
           'No MCP server is included; the local viewer is read-only and does not yet render the visual evidence gallery.',
+          'Host-streaming batches are declared as buffered until the bounded 50 ms/128-record writer is implemented.',
+          'Visual redaction summary is explicit but selector masking is not yet enabled for screenshots.',
         ],
       },
       elements,
@@ -701,6 +745,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     await context.close();
     await rename(stagingDirectory, absoluteOutput);
     promoted = true;
+    setState('completed');
     return {
       outputDirectory: absoluteOutput,
       contractPath: join(absoluteOutput, 'behavior-contract.json'),
@@ -709,6 +754,10 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
       sessionIndexManifestPath: join(absoluteOutput, 'session-index.json'),
       contract,
     };
+  } catch (error) {
+    if (error instanceof CaptureCancelledError) setState('cancelled');
+    else setState('failed');
+    throw error;
   } finally {
     if (!promoted) await rm(stagingDirectory, { recursive: true, force: true });
     await browser.close();
