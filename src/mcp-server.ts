@@ -30,8 +30,19 @@ async function dispatch(service: SessionService, method: string, params: Record<
   if (method === 'evidence.get') return service.getEvidence(stringParam(params, 'packagePath')!, params as never);
   if (method === 'revision.list') return service.listRevisions(stringParam(params, 'packagePath')!);
   if (method === 'evidence.graph.get') return service.getEvidenceGraph(stringParam(params, 'packagePath')!, typeof params.revisionId === 'string' ? params.revisionId : undefined);
-  if (method === 'probe.run') return service.runProbe(typeof params.packagePath === 'string' ? params.packagePath : 'artifacts/phase1/latest');
-  if (method === 'annotation.create') return service.createAnnotation(stringParam(params, 'packagePath')!, { note: stringParam(params, 'note')!, ...(typeof params.targetRef === 'string' ? { targetRef: params.targetRef } : {}), ...(Array.isArray(params.evidenceRefs) ? { evidenceRefs: params.evidenceRefs.filter((value): value is string => typeof value === 'string') } : {}) });
+  if (method === 'probe.run') return service.runProbe(typeof params.packagePath === 'string' ? params.packagePath : 'artifacts/phase1/latest', {
+    ...(typeof params.baseRevisionId === 'string' ? { baseRevisionId: params.baseRevisionId } : {}),
+    ...(typeof params.resetRecipeId === 'string' ? { resetRecipeId: params.resetRecipeId } : {}),
+    ...(typeof params.controlRun === 'boolean' ? { controlRun: params.controlRun } : {}),
+    ...(Array.isArray(params.timingOffsetsMs) ? { timingOffsetsMs: params.timingOffsetsMs.filter((value): value is number => typeof value === 'number') } : {}),
+    ...(Array.isArray(params.directions) ? { directions: params.directions.filter((value): value is 'forward' | 'reverse' => value === 'forward' || value === 'reverse') } : {}),
+    ...(Array.isArray(params.interruptionAtMs) ? { interruptionAtMs: params.interruptionAtMs.filter((value): value is number => typeof value === 'number') } : {}),
+    ...(Array.isArray(params.viewports) ? { viewports: params.viewports.filter((value): value is { width: number; height: number } => typeof value === 'object' && value !== null && typeof (value as { width?: unknown }).width === 'number' && typeof (value as { height?: unknown }).height === 'number') } : {}),
+    ...(typeof params.maxRuns === 'number' ? { maxRuns: params.maxRuns } : {}),
+    ...(typeof params.timeoutMs === 'number' ? { timeoutMs: params.timeoutMs } : {}),
+    ...(Array.isArray(params.behaviorIds) ? { behaviorIds: params.behaviorIds.filter((value): value is string => typeof value === 'string') } : {}),
+  });
+  if (method === 'annotation.create') return service.createAnnotation(stringParam(params, 'packagePath')!, { note: stringParam(params, 'note')!, ...(typeof params.targetRef === 'string' ? { targetRef: params.targetRef } : {}), ...(Array.isArray(params.evidenceRefs) ? { evidenceRefs: params.evidenceRefs.filter((value): value is string => typeof value === 'string') } : {}), ...(typeof params.edgeCorrection === 'object' && params.edgeCorrection !== null ? { edgeCorrection: { edgeId: String((params.edgeCorrection as { edgeId?: unknown }).edgeId ?? ''), ...(['direct', 'experiment_supported', 'correlated', 'unknown'].includes(String((params.edgeCorrection as { class?: unknown }).class)) ? { class: (params.edgeCorrection as { class: 'direct' | 'experiment_supported' | 'correlated' | 'unknown' }).class } : {}), ...(typeof (params.edgeCorrection as { limitation?: unknown }).limitation === 'string' ? { limitation: (params.edgeCorrection as { limitation: string }).limitation } : {}) } } : {}) });
   if (method === 'replica.verify') return service.verifyReplica(stringParam(params, 'packagePath')!);
   if (method === 'capture.export') return service.exportCapture(stringParam(params, 'sourcePath')!, stringParam(params, 'destinationPath')!);
   throw new Error(`Unknown MCP method: ${method}`);

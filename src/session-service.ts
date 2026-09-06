@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { captureSession, CaptureCancelledError } from './capture.js';
 import { inspectSessionPackage, querySessionBehaviors, querySessionRecords, type SessionRecordQuery } from './session-index.js';
 import { validateContract, validateSessionIndexManifest } from './validate.js';
-import { runTechnicalProbes } from './probes.js';
+import { normalizeProbeRequest, runTechnicalProbes, type ProbeRunRequest } from './probes.js';
 import { verifyPhase0 } from './verify.js';
 import type { BehaviorKind, CaptureSessionState, ContractPackage, VerificationReport } from './types.js';
 import { readRevisionIndex, revisionEntryFor, validateRevision, writeRevisionIndex, type RevisionEntry } from './revisions.js';
@@ -264,12 +264,19 @@ export class SessionService {
     return revisions;
   }
 
-  async #writeProbeRevision(packagePath: string, reportPath: string): Promise<{ revisionId: string; contractPath: string; reportPath: string }> {
+  async #writeProbeRevision(packagePath: string, reportPath: string, baseRevisionId?: string, behaviorIds: string[] = []): Promise<{ revisionId: string; contractPath: string; reportPath: string }> {
     const packageRoot = resolve(this.#workspaceRoot, packagePath);
     const index = await validateSessionIndexManifest(JSON.parse(await readFile(resolve(packageRoot, 'session-index.json'), 'utf8')));
-    const baseContract = await validateContract(JSON.parse(await readFile(resolve(packageRoot, index.contract.path), 'utf8')));
+    const indexedContract = await validateContract(JSON.parse(await readFile(resolve(packageRoot, index.contract.path), 'utf8')));
+    const revisions = await readRevisionIndex(packageRoot, indexedContract.manifest.sessionId);
+    const selectedBase = revisionEntryFor(revisions, baseRevisionId);
+    if (baseRevisionId && !selectedBase) throw new Error(`Unknown base revision: ${baseRevisionId}`);
+    const baseRevision = selectedBase ? await validateRevision(packageRoot, selectedBase) : undefined;
+    const baseContract = baseRevision?.contract ?? indexedContract;
     let baseGraph: EvidenceGraph;
-    if (index.evidenceGraph) {
+    if (baseRevision) {
+      baseGraph = baseRevision.graph;
+    } else if (index.evidenceGraph) {
       const baseGraphPath = resolve(packageRoot, index.evidenceGraph.path);
       baseGraph = await validateEvidenceGraph(JSON.parse(await readFile(baseGraphPath, 'utf8')));
     } else {
@@ -297,28 +304,33 @@ export class SessionService {
         probeRun: { path: relativeReportPath, sha256: reportSha },
       },
     };
+    const testedBehaviorIds = behaviorIds.length > 0 ? behaviorIds : revisionContract.behaviors.map((behavior) => behavior.behaviorId);
     const graph: EvidenceGraph = {
       ...baseGraph,
       revision: revisionId,
       generatedAt: new Date().toISOString(),
       nodes: [
         ...baseGraph.nodes.filter((node) => node.kind !== 'probe_run'),
-        { id: `probe:${revisionId}`, kind: 'probe_run', evidenceRefs: [probeEvidenceId], targetRef: null, navigationId: null, clockUncertaintyMs: null, payload: { status: 'completed', reportPath: relativeReportPath } },
+        ...testedBehaviorIds.map((behaviorId) => ({ id: `probe:${revisionId}:${behaviorId}`, kind: 'probe_run' as const, evidenceRefs: [probeEvidenceId], targetRef: revisionContract.behaviors.find((behavior) => behavior.behaviorId === behaviorId)?.targetRef ?? null, navigationId: null, clockUncertaintyMs: null, payload: { status: 'completed', reportPath: relativeReportPath, behaviorId } })),
       ],
       edges: baseGraph.edges.filter((edge) => !edge.from.startsWith('probe:') && !edge.to.startsWith('probe:')),
       limitations: baseGraph.limitations.filter((limitation) => !limitation.includes('Probe-run node is a placeholder')),
     };
-    graph.edges.push(...revisionContract.behaviors.slice(0, 1).map((behavior, index) => ({
-      id: `edge:probe:${index}`,
-      from: `probe:${revisionId}`,
+    graph.edges.push(...testedBehaviorIds.flatMap((behaviorId, index) => {
+      const behavior = revisionContract.behaviors.find((candidate) => candidate.behaviorId === behaviorId);
+      if (!behavior) return [];
+      return [{
+      id: `edge:probe:${revisionId}:${index}`,
+      from: `probe:${revisionId}:${behaviorId}`,
       to: `state:${behavior.behaviorId}`,
       class: 'experiment_supported' as const,
       evidenceRefs: [probeEvidenceId],
       targetRef: behavior.targetRef,
       navigationId: null,
       clockUncertaintyMs: null,
-      limitation: 'Technical probe result is associated with the first covered behavior; per-behavior causality requires a targeted probe.',
-    })));
+      limitation: 'Probe/control variation is recorded for this behavior; causal scope is limited to the declared target and navigation.',
+      }];
+    }));
     await validateEvidenceGraph(graph);
     await validateContract(revisionContract);
     const revisionContractPath = resolve(revisionRoot, 'behavior-contract.json');
@@ -334,10 +346,9 @@ export class SessionService {
       evidenceGraph: { path: `revisions/${revisionId}/evidence-graph.json`, sha256: createHash('sha256').update(await readFile(revisionGraphPath)).digest('hex') },
       probeRun: { path: relativeReportPath, sha256: reportSha },
     };
-    const revisionIndex = await readRevisionIndex(packageRoot, baseContract.manifest.sessionId);
-    revisionIndex.revisions.push(revisionEntry);
-    revisionIndex.activeRevisionId = revisionId;
-    await writeRevisionIndex(packageRoot, revisionIndex);
+    revisions.revisions.push(revisionEntry);
+    revisions.activeRevisionId = revisionId;
+    await writeRevisionIndex(packageRoot, revisions);
     return { revisionId, contractPath: revisionContractPath, reportPath: revisionReportPath };
   }
 
@@ -395,19 +406,34 @@ export class SessionService {
     return { snapshot, graph: await validateEvidenceGraph(JSON.parse(await readFile(resolve(packageRoot, manifest.evidenceGraph.path), 'utf8'))) };
   }
 
-  async runProbe(packagePath = 'artifacts/phase1/latest'): Promise<ServiceJob> {
-    const job = await this.#jobs.create('probe.run');
+  async runProbe(packagePath = 'artifacts/phase1/latest', request: ProbeRunRequest = {}): Promise<ServiceJob> {
+    const probePlan = normalizeProbeRequest(request);
+    const job = await this.#jobs.create('probe.run', { packagePath, ...request, probePlan });
     const outputPath = resolve(this.#workspaceRoot, `.wbc/jobs/${job.jobId}/technical-probe-report.json`);
-    void runTechnicalProbes(outputPath)
+    await this.#jobs.update((current) => ({ ...(current ?? job), status: 'running', updatedAt: new Date().toISOString(), outputPath }), job.jobId);
+    const probePromise = runTechnicalProbes(outputPath, probePlan);
+    let timeoutHandle: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error(`Probe timeout after ${probePlan.timeoutMs} ms`)), probePlan.timeoutMs);
+      timeoutHandle.unref();
+    });
+    const heartbeatHandle = setInterval(() => {
+      void this.#jobs.update((current) => ({ ...(current ?? job), heartbeatAt: new Date().toISOString(), updatedAt: new Date().toISOString() }), job.jobId).catch(() => undefined);
+    }, 100);
+    heartbeatHandle.unref();
+    void Promise.race([probePromise, timeoutPromise])
       .then(async (report) => {
-        const revision = await this.#writeProbeRevision(packagePath, outputPath);
+        const current = await this.#jobs.get(job.jobId);
+        if (current.cancelRequestedAt) return this.#jobs.update((latest) => ({ ...(latest ?? current), status: 'cancelled', updatedAt: new Date().toISOString(), outputPath }), job.jobId);
+        const revision = await this.#writeProbeRevision(packagePath, outputPath, typeof request.baseRevisionId === 'string' ? request.baseRevisionId : undefined, probePlan.behaviorIds);
         return this.#jobs.update((current) => ({ ...(current ?? job), status: report.summary.failed === 0 ? 'completed' : 'failed', updatedAt: new Date().toISOString(), outputPath, result: { summary: report.summary, revisionId: revision.revisionId, contractPath: revision.contractPath } }), job.jobId);
       })
-      .catch((error: unknown) => this.#jobs.update((current) => ({ ...(current ?? job), status: 'failed', updatedAt: new Date().toISOString(), outputPath, error: { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error), stage: 'probe' } }), job.jobId));
-    return { ...job, status: 'running', outputPath };
+      .catch((error: unknown) => this.#jobs.update((current) => ({ ...(current ?? job), status: 'failed', updatedAt: new Date().toISOString(), outputPath, error: { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error), stage: 'probe' } }), job.jobId))
+      .finally(() => { if (timeoutHandle) clearTimeout(timeoutHandle); clearInterval(heartbeatHandle); });
+    return { ...job, status: 'running', outputPath, parameters: { packagePath, ...request, probePlan } };
   }
 
-  async createAnnotation(packagePath: string, input: { note: string; targetRef?: string; evidenceRefs?: string[] }): Promise<{ revisionId: string; contractPath: string; graphPath: string }> {
+  async createAnnotation(packagePath: string, input: { note: string; targetRef?: string; evidenceRefs?: string[]; edgeCorrection?: { edgeId: string; class?: 'direct' | 'experiment_supported' | 'correlated' | 'unknown'; limitation?: string } }): Promise<{ revisionId: string; contractPath: string; graphPath: string }> {
     if (!input.note.trim()) throw new Error('Annotation note must not be empty');
     return createAnnotationRevision(resolve(this.#workspaceRoot, packagePath), {
       annotationId: randomUUID(),
@@ -415,6 +441,7 @@ export class SessionService {
       note: input.note,
       ...(input.targetRef ? { targetRef: input.targetRef } : {}),
       ...(input.evidenceRefs ? { evidenceRefs: input.evidenceRefs } : {}),
+      ...(input.edgeCorrection ? { edgeCorrection: input.edgeCorrection } : {}),
     });
   }
 

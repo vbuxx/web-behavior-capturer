@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0.0",
+  "note": "Evaluation-only ground truth. The evaluator reads this file outside every agent workspace.",
+  "tasks": {
+    "hover-focus-interruption": { "expected": ["hover", "interrupted_transition"] },
+    "css-waapi": { "expected": ["css_animation"] },
+    "nested-scroller-reverse": { "container": "nested-scroller", "reverse": true },
+    "gsap-boolean-numeric-scrub": { "modes": ["direct", "numeric"], "reverse": true },
+    "overlap-composition": { "requires": ["multiple_tracks", "composition_order"] },
+    "main-navigation-cancellation": { "requires": ["navigation_epoch", "cancelled_session", "resume_revision"] },
+    "open-shadow-dom": { "requires": ["open_shadow_scope", "mutation", "interaction"] },
+    "oopif": { "requires": ["cross_origin_iframe", "target_coverage"] },
+    "worker-lifecycle": { "requires": ["worker_attach", "message", "termination"] },
+    "network-delayed-state": { "requires": ["network_completion", "observable_state"], "payloads": false },
+    "visual-masking": { "requires": ["password_mask", "sensitive_selector_mask"] },
+    "ambiguous-locator": { "requires": ["ambiguity_rejection", "structural_fingerprint"] }
+  }
+}

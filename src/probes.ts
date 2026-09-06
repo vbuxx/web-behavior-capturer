@@ -60,18 +60,71 @@ export interface TechnicalProbeReport {
     status: 'passed' | 'failed';
   };
   summary: { passed: number; failed: number; total: number };
+  probePlan?: NormalizedProbePlan;
   limitations: string[];
+}
+
+export interface ProbeRunRequest {
+  packagePath?: string;
+  baseRevisionId?: string;
+  resetRecipeId?: string;
+  controlRun?: boolean;
+  timingOffsetsMs?: number[];
+  directions?: Array<'forward' | 'reverse'>;
+  interruptionAtMs?: number[];
+  viewports?: Array<{ width: number; height: number }>;
+  maxRuns?: number;
+  timeoutMs?: number;
+  behaviorIds?: string[];
+}
+
+export interface NormalizedProbePlan {
+  resetRecipeId: string;
+  controlRun: boolean;
+  timingOffsetsMs: number[];
+  directions: Array<'forward' | 'reverse'>;
+  interruptionAtMs: number[];
+  viewports: Array<{ width: number; height: number }>;
+  maxRuns: number;
+  timeoutMs: number;
+  behaviorIds: string[];
+}
+
+export const probeRecipeRegistry = new Set([
+  'phase0-hover-interruption', 'phase0-css-waapi', 'nested-scroller-reverse', 'gsap-scrub-modes',
+  'overlap-composition', 'navigation-cancellation', 'open-shadow-semantic', 'worker-lifecycle',
+  'network-delayed-state', 'visual-redaction', 'ambiguous-structural-locator', 'oopif-target-registry',
+]);
+
+export function normalizeProbeRequest(request: ProbeRunRequest = {}): NormalizedProbePlan {
+  const resetRecipeId = request.resetRecipeId ?? 'phase0-hover-interruption';
+  if (!probeRecipeRegistry.has(resetRecipeId)) throw new Error(`Unknown probe reset recipe: ${resetRecipeId}`);
+  const timingOffsetsMs = (request.timingOffsetsMs ?? [0]).map((value) => Number(value));
+  const interruptionAtMs = (request.interruptionAtMs ?? []).map((value) => Number(value));
+  if (timingOffsetsMs.some((value) => !Number.isFinite(value) || Math.abs(value) > 60_000)) throw new Error('Probe timing offsets must be finite and within +/-60000 ms');
+  if (interruptionAtMs.some((value) => !Number.isFinite(value) || value < 0 || value > 60_000)) throw new Error('Probe interruption points must be within 0..60000 ms');
+  const directions = request.directions ?? ['forward'];
+  if (directions.some((direction) => direction !== 'forward' && direction !== 'reverse')) throw new Error('Probe direction must be forward or reverse');
+  const viewports = (request.viewports ?? [{ width: 1100, height: 740 }]).map((viewport) => ({ width: Math.floor(viewport.width), height: Math.floor(viewport.height) }));
+  if (viewports.some((viewport) => viewport.width < 320 || viewport.width > 4096 || viewport.height < 240 || viewport.height > 4096)) throw new Error('Probe viewport is outside supported bounds');
+  const maxRuns = Math.floor(request.maxRuns ?? Math.max(1, timingOffsetsMs.length * directions.length * Math.max(1, viewports.length)));
+  const timeoutMs = Math.floor(request.timeoutMs ?? 120_000);
+  if (!Number.isInteger(maxRuns) || maxRuns < 1 || maxRuns > 100) throw new Error('Probe maxRuns must be between 1 and 100');
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 20 * 60_000) throw new Error('Probe timeoutMs must be between 1000 and 1200000');
+  const behaviorIds = [...new Set((request.behaviorIds ?? []).filter((value) => typeof value === 'string' && value.length > 0))];
+  return { resetRecipeId, controlRun: request.controlRun ?? false, timingOffsetsMs, directions, interruptionAtMs, viewports, maxRuns, timeoutMs, behaviorIds };
 }
 
 function round(value: number, digits = 3): number {
   return Number(value.toFixed(digits));
 }
 
-export async function runTechnicalProbes(outputFile?: string): Promise<TechnicalProbeReport> {
+export async function runTechnicalProbes(outputFile?: string, request: ProbeRunRequest = {}): Promise<TechnicalProbeReport> {
+  const probePlan = normalizeProbeRequest(request);
   const server = await startFixtureServer();
   const browser = await chromium.launch({ headless: true, args: ['--site-per-process'] });
   try {
-    const context = await browser.newContext({ viewport: { width: 1100, height: 740 } });
+    const context = await browser.newContext({ viewport: probePlan.viewports[0] ?? { width: 1100, height: 740 } });
     await context.addInitScript('globalThis.__name = globalThis.__name || ((target) => target);');
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
@@ -254,11 +307,13 @@ export async function runTechnicalProbes(outputFile?: string): Promise<Technical
         failed: passFlags.filter((value) => !value).length,
         total: passFlags.length,
       },
+      probePlan,
       limitations: [
         'Cross-origin OOPIF is forced with site-per-process in a diagnostic browser launch; natural capture still uses default launch flags.',
         'Child collector installation is proven for the OOPIF frame, but not recursively for workers spawned by child targets.',
         'The 72 ms fixture does not establish a minimum supported animation duration.',
         'Clock comparison covers one page realm and does not calibrate OOPIF or worker clocks.',
+        'The validated probe plan is recorded with the revision; this diagnostic implementation executes the canonical fixture run and does not synthesize unobserved variations.',
       ],
     };
     if (outputFile) {

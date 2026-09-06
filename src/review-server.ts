@@ -166,10 +166,12 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
       }
       if (url.pathname === '/api/timeline') {
         const query: SessionRecordQuery = { limit: Math.min(optionalNumber(url, 'limit') ?? 100, 100), byteBudget: Math.min(optionalNumber(url, 'byteBudget') ?? 65_536, 65_536) };
+        const mode = url.searchParams.get('mode') ?? 'time';
+        if (mode !== 'time' && mode !== 'scroll') throw new Error('Timeline mode must be time or scroll');
         const revisionId = url.searchParams.get('revisionId');
         if (revisionId) { await loadSelectedContract(packageRoot, revisionId); query.revisionId = revisionId; }
         const page = await querySessionRecords(packageRoot, query);
-        writeJson(response, 200, { points: page.records.map((record) => ({ time: record.sourceTime, type: record.type, targetRef: record.targetRef, source: record.source })), revision: page.revision, nextCursor: page.nextCursor });
+        writeJson(response, 200, { mode, points: page.records.map((record) => ({ time: record.sourceTime, progress: typeof record.payload.containerProgress === 'number' ? record.payload.containerProgress : typeof record.payload.progress === 'number' ? record.payload.progress : null, type: record.type, targetRef: record.targetRef, source: record.source })), revision: page.revision, nextCursor: page.nextCursor });
         return;
       }
       if (url.pathname === '/api/verification') {
@@ -180,7 +182,14 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
         return;
       }
       if (url.pathname === '/api/probe' && request.method === 'POST') {
-        const job = await service.runProbe('.');
+        const body = request.headers['content-length'] || request.headers['transfer-encoding'] ? JSON.parse(await readBody(request)) as Record<string, unknown> : {};
+        const job = await service.runProbe('.', {
+          ...(typeof body.baseRevisionId === 'string' ? { baseRevisionId: body.baseRevisionId } : {}),
+          ...(typeof body.resetRecipeId === 'string' ? { resetRecipeId: body.resetRecipeId } : {}),
+          ...(typeof body.maxRuns === 'number' ? { maxRuns: body.maxRuns } : {}),
+          ...(typeof body.timeoutMs === 'number' ? { timeoutMs: body.timeoutMs } : {}),
+          ...(typeof body.controlRun === 'boolean' ? { controlRun: body.controlRun } : {}),
+        });
         writeJson(response, 202, job);
         return;
       }
@@ -228,6 +237,11 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
         const body = JSON.parse(await readBody(request)) as Record<string, unknown>;
         if (typeof body.note !== 'string' || body.note.trim().length === 0 || body.note.length > 2_000) throw new Error('Annotation note must be 1-2000 characters');
         const manifest = await validateSessionIndexManifest(JSON.parse(await readFile(resolve(packageRoot, 'session-index.json'), 'utf8')));
+        const rawCorrection = typeof body.edgeCorrection === 'object' && body.edgeCorrection !== null ? body.edgeCorrection as Record<string, unknown> : null;
+        const edgeClass = rawCorrection && ['direct', 'experiment_supported', 'correlated', 'unknown'].includes(String(rawCorrection.class)) ? String(rawCorrection.class) as 'direct' | 'experiment_supported' | 'correlated' | 'unknown' : undefined;
+        const edgeCorrection = rawCorrection && typeof rawCorrection.edgeId === 'string' && rawCorrection.edgeId.length > 0
+          ? { edgeId: rawCorrection.edgeId, ...(edgeClass ? { class: edgeClass } : {}), ...(typeof rawCorrection.limitation === 'string' && rawCorrection.limitation.length <= 2_000 ? { limitation: rawCorrection.limitation } : {}) }
+          : undefined;
         const annotation = {
           annotationId: randomUUID(),
           createdAt: new Date().toISOString(),
@@ -235,6 +249,7 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
           note: body.note,
           ...(typeof body.targetRef === 'string' ? { targetRef: body.targetRef } : {}),
           ...(Array.isArray(body.evidenceRefs) ? { evidenceRefs: body.evidenceRefs.filter((ref): ref is string => typeof ref === 'string').slice(0, 50) } : {}),
+          ...(edgeCorrection ? { edgeCorrection } : {}),
         };
         await mkdir(packageRoot, { recursive: true });
         await appendFile(annotationPath, `${JSON.stringify(annotation)}\n`, 'utf8');

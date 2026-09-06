@@ -1,4 +1,4 @@
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import type { BehaviorKind } from './types.js';
 
@@ -179,7 +179,20 @@ async function main(): Promise<void> {
 
   if (command === 'probe-run') {
     const { SessionService } = await import('./session-service.js');
-    console.log(JSON.stringify(await new SessionService().runProbe(option('--package') ?? 'artifacts/phase1/latest'), null, 2));
+    const directions = process.argv.includes('--reverse') ? ['reverse' as const] : ['forward' as const];
+    const baseRevisionId = option('--base-revision');
+    const resetRecipeId = option('--reset-recipe');
+    console.log(JSON.stringify(await new SessionService().runProbe(option('--package') ?? 'artifacts/phase1/latest', {
+      ...(baseRevisionId ? { baseRevisionId } : {}),
+      ...(resetRecipeId ? { resetRecipeId } : {}),
+      ...(process.argv.includes('--control-run') ? { controlRun: true } : {}),
+      ...(option('--timing-offsets') ? { timingOffsetsMs: option('--timing-offsets')!.split(',').map(Number) } : {}),
+      directions,
+      ...(option('--interrupt-at') ? { interruptionAtMs: option('--interrupt-at')!.split(',').map(Number) } : {}),
+      ...(option('--max-runs') ? { maxRuns: Number(option('--max-runs')) } : {}),
+      ...(option('--timeout-ms') ? { timeoutMs: Number(option('--timeout-ms')) } : {}),
+      ...(option('--behaviors') ? { behaviorIds: option('--behaviors')!.split(',').filter(Boolean) } : {}),
+    }), null, 2));
     return;
   }
 
@@ -230,25 +243,28 @@ async function main(): Promise<void> {
   }
 
   if (command === 'evaluate') {
-    const { evaluatePhase2 } = await import('./evaluation.js');
+    const { defaultCodexCommand, evaluatePhase2 } = await import('./evaluation.js');
     const packageDirectory = resolve(option('--package') ?? 'artifacts/phase1/latest');
-    const report = resolve(option('--out') ?? '.wbc/evaluation/phase2-report.json');
-    const agentCommand = option('--agent-command');
+    const model = option('--model') ?? 'gpt-5.6-sol';
+    const reasoning = option('--reasoning') ?? 'high';
+    const reportDir = option('--report-dir');
+    const report = resolve(option('--out') ?? (reportDir ? join(reportDir, 'phase2-report.json') : '.wbc/evaluation/phase2-report.json'));
+    const agentCommand = option('--agent-command') ?? defaultCodexCommand(model, reasoning);
     const taskId = option('--task');
     const condition = option('--condition');
     const timeoutMs = option('--timeout-ms');
     const evidenceByteBudget = option('--evidence-byte-budget');
-    const model = option('--model');
-    const reasoning = option('--reasoning');
+    const startingRef = option('--starting-ref');
     const seed = option('--seed');
     console.log(JSON.stringify(await evaluatePhase2(packageDirectory, report, Number(option('--repetitions') ?? 3), {
-      ...(agentCommand ? { agentCommand } : {}),
+      agentCommand,
       ...(taskId ? { taskId } : {}),
       ...(condition ? { condition: condition as 'screenshot' | 'trace' | 'wbc' } : {}),
       ...(timeoutMs ? { timeoutMs: Number(timeoutMs) } : {}),
       ...(evidenceByteBudget ? { evidenceByteBudget: Number(evidenceByteBudget) } : {}),
-      ...(model ? { model } : {}),
-      ...(reasoning ? { reasoning } : {}),
+      model,
+      reasoning,
+      ...(startingRef ? { startingRef } : {}),
       ...(seed ? { seed: Number(seed) } : {}),
     }), null, 2));
     return;

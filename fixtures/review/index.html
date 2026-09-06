@@ -33,7 +33,7 @@
         <div class="table-wrap"><table><thead><tr><th>Source</th><th>Type</th><th>Target</th><th>Time</th></tr></thead><tbody id="evidence"></tbody></table></div>
       </section>
       <section aria-labelledby="timeline-title">
-        <div class="section-heading"><div><h2 id="timeline-title">Timeline</h2><p>Bounded event timeline from the selected revision.</p></div><button id="reload-timeline" type="button">Reload timeline</button></div>
+        <div class="section-heading"><div><h2 id="timeline-title">Timeline</h2><p>Bounded event timeline from the selected revision.</p></div><label>Domain <select id="timeline-mode"><option value="time">time</option><option value="scroll">scroll progress</option></select></label><button id="reload-timeline" type="button">Reload timeline</button></div>
         <div class="table-wrap"><table><thead><tr><th>Time</th><th>Type</th><th>Source</th><th>Target</th></tr></thead><tbody id="timeline"></tbody></table></div>
       </section>
       <section aria-labelledby="visual-title">
@@ -49,11 +49,12 @@
       <section aria-labelledby="verification-title">
         <div class="section-heading"><div><h2 id="verification-title">Reference vs replica</h2><p id="verification-summary">Loading verification reports…</p></div><button id="run-probe" type="button">Request probe</button></div>
         <pre class="detail" id="verification-detail"></pre>
+        <div class="probe-controls"><label>Reset recipe <input id="probe-recipe" value="phase0-hover-interruption" maxlength="80" /></label><label>Max runs <input id="probe-max-runs" type="number" min="1" max="100" value="1" /></label></div>
         <pre class="detail" id="probe-status"></pre>
       </section>
       <section aria-labelledby="annotation-title">
         <h2 id="annotation-title">Immutable annotation</h2>
-        <form id="annotation-form"><label for="annotation-note">Review note</label><textarea id="annotation-note" maxlength="2000" required></textarea><button type="submit">Append annotation</button></form>
+        <form id="annotation-form"><label for="annotation-note">Review note</label><textarea id="annotation-note" maxlength="2000" required></textarea><label for="annotation-edge">Optional edge ID</label><input id="annotation-edge" maxlength="200" /><label for="annotation-class">Optional edge class</label><select id="annotation-class"><option value="">unchanged</option><option>direct</option><option>experiment_supported</option><option>correlated</option><option>unknown</option></select><button type="submit">Append annotation</button></form>
         <div id="annotations"></div>
       </section>
       <p id="error" role="alert"></p>

@@ -13,3 +13,5 @@ export const schemaPath = resolve(repoRoot, 'schema/behavior-contract.schema.jso
 export const verificationScenarioSchemaPath = resolve(repoRoot, 'schema/verification-scenario.schema.json');
 export const sessionIndexSchemaPath = resolve(repoRoot, 'schema/session-index.schema.json');
 export const evidenceGraphSchemaPath = resolve(repoRoot, 'schema/evidence-graph.schema.json');
+export const evaluationTaskSchemaPath = resolve(repoRoot, 'schema/evaluation-task.schema.json');
+export const evaluationTaskSpecPath = resolve(repoRoot, 'fixtures/evaluation/task-spec.json');

@@ -41,7 +41,7 @@
     "mcp": "tsx src/mcp-server.ts",
     "test": "tsx --test --test-concurrency=1 test/**/*.test.ts",
     "test:e2e": "tsx --test --test-concurrency=1 test/e2e.test.ts",
-    "test:unit": "tsx --test --test-concurrency=1 test/agent-adapter.test.ts test/archive-retention.test.ts test/redaction.test.ts test/rotation-recovery.test.ts test/rotation-staging.test.ts test/staging.test.ts",
+    "test:unit": "tsx --test --test-concurrency=1 test/agent-adapter.test.ts test/archive-retention.test.ts test/evaluation-task.test.ts test/evaluation.test.ts test/phase2-harness.test.ts test/redaction.test.ts test/rotation-recovery.test.ts test/rotation-staging.test.ts test/staging.test.ts",
     "test:browser": "tsx --test --test-concurrency=1 test/capture-lifecycle.test.ts test/e2e.test.ts test/nested-scroller.test.ts test/open-shadow.test.ts test/review-server.test.ts test/session-service.test.ts test/visual-redaction.test.ts",
     "test:stress": "tsx --test --test-concurrency=1 test/corruption-benchmark.test.ts test/crash-benchmark.test.ts test/failure-benchmark.test.ts test/quota-benchmark.test.ts test/reliability-benchmark.test.ts",
     "test:performance": "tsx --test --test-concurrency=1 test/benchmark.test.ts test/browser-benchmark.test.ts test/capture-benchmark.test.ts",

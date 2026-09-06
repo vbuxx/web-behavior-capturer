@@ -39,6 +39,35 @@ export async function resolveContractElement(
   if (source.frame !== 'main') throw new Error(`Cross-frame locator resolution is not implemented for ${ref}`);
   await page.evaluate('globalThis.__name = globalThis.__name || ((target) => target);');
 
+  if (source.scope?.kind === 'open_shadow') {
+    const token = `wbc-${randomUUID()}`;
+    const resolved = await page.evaluate(({ captured, value }) => {
+      const hostName = captured.scope?.hostRef?.split(':').at(-1);
+      const host = hostName ? document.querySelector(`[data-wbc-id="${CSS.escape(hostName)}"]`) : null;
+      let root: Document | ShadowRoot | null = host?.shadowRoot ?? null;
+      for (const selector of captured.scope?.shadowPath ?? []) {
+        const nested: Element | null = root?.querySelector(selector) ?? null;
+        root = nested?.shadowRoot ?? null;
+      }
+      const element = root?.querySelector(captured.selector);
+      if (!(element instanceof HTMLElement)) return false;
+      element.setAttribute('data-wbc-resolved', value);
+      return true;
+    }, { captured: source, value: token });
+    if (!resolved) throw new Error(`Open shadow locator could not resolve ${ref}`);
+    return {
+      ref,
+      selector: `[data-wbc-resolved="${token}"]`,
+      score: 1,
+      margin: 1,
+      strategy: 'captured_identity',
+      candidateCount: 1,
+      runnerUpScore: 0,
+      matchedTagName: 'unknown',
+      matchedRole: null,
+    };
+  }
+
   const candidates = await page.locator('body *').evaluateAll((elements, captured: ElementRef) => {
     const inferRole = (element: Element): string | null => {
       const explicit = element.getAttribute('role');

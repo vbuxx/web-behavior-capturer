@@ -7,6 +7,7 @@ import { compileEvidenceGraph, type EvidenceGraph } from './evidence-graph.js';
 import { validateEvidenceGraph } from './evidence-graph-validate.js';
 import { readRevisionIndex, revisionEntryFor, validateRevision, writeRevisionIndex, type RevisionEntry } from './revisions.js';
 import type { ContractPackage, EvidenceRecord } from './types.js';
+import type { EvidenceGraphEdge } from './evidence-graph.js';
 
 export interface AnnotationRevisionInput {
   annotationId: string;
@@ -14,6 +15,11 @@ export interface AnnotationRevisionInput {
   note: string;
   targetRef?: string;
   evidenceRefs?: string[];
+  edgeCorrection?: {
+    edgeId: string;
+    class?: EvidenceGraphEdge['class'];
+    limitation?: string;
+  };
 }
 
 export async function createAnnotationRevision(packageRootInput: string, annotation: AnnotationRevisionInput): Promise<{ revisionId: string; contractPath: string; graphPath: string }> {
@@ -45,12 +51,23 @@ export async function createAnnotationRevision(packageRootInput: string, annotat
   await writeFile(annotationPath, `${JSON.stringify(annotation)}\n`, 'utf8');
   const annotationEvidenceId = `annotation-${annotation.annotationId}`;
   const annotationEvidence = { id: annotationEvidenceId, path: relative(packageRoot, annotationPath), mediaType: 'application/x-ndjson' as const, sha256: createHash('sha256').update(await readFile(annotationPath)).digest('hex') };
-  const revisionGraph: EvidenceGraph = {
+  let revisionGraph: EvidenceGraph = {
     ...graph,
     revision: revisionId,
     generatedAt: new Date().toISOString(),
     limitations: [...graph.limitations, `Human annotation ${annotation.annotationId} is retained as immutable sidecar evidence; it does not alter raw observations.`],
   };
+  if (annotation.edgeCorrection) {
+    const target = revisionGraph.edges.find((edge) => edge.id === annotation.edgeCorrection?.edgeId);
+    if (!target) throw new Error(`Unknown evidence edge for annotation correction: ${annotation.edgeCorrection.edgeId}`);
+    revisionGraph = {
+      ...revisionGraph,
+      edges: revisionGraph.edges.map((edge) => edge.id === annotation.edgeCorrection?.edgeId
+        ? { ...edge, ...(annotation.edgeCorrection.class ? { class: annotation.edgeCorrection.class } : {}), ...(annotation.edgeCorrection.limitation ? { limitation: annotation.edgeCorrection.limitation } : {}) }
+        : edge),
+      limitations: annotation.edgeCorrection.limitation ? [...revisionGraph.limitations, `Annotation ${annotation.annotationId} supplied a bounded edge limitation.`] : revisionGraph.limitations,
+    };
+  }
   const revisionContract: ContractPackage = {
     ...contract,
     evidenceIndex: [...contract.evidenceIndex, annotationEvidence],

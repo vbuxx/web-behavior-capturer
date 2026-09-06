@@ -84,7 +84,11 @@ function behaviorStateNode(contract: ContractPackage, behavior: Behavior, record
     focus: null,
     visibility: 'unknown',
     relevantAttributes: {},
-    scroll: firstSample?.scrollY ?? null,
+    scroll: {
+      containerRef: behavior.timeline.domain === 'scroll' ? behavior.timeline.containerRef : 'viewport',
+      offsetPx: firstSample?.containerOffsetPx ?? firstSample?.scrollY ?? null,
+      progress: firstSample?.containerProgress ?? firstSample?.progress ?? null,
+    },
     layoutCheckpoint: firstSample ? { x: firstSample.x, y: firstSample.y, transform: firstSample.transform } : null,
   };
   return {

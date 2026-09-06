@@ -13,7 +13,7 @@ test('evaluation separates verifier measurements from unavailable agent baseline
     assert.equal(report.conditions.wbc.agentSuccess, 'not_measured');
     assert.equal(report.conditions.screenshot.status, 'unavailable');
     assert.equal(report.fixtureMatrix.length, 12);
-    assert.equal(JSON.parse(await readFile(reportPath, 'utf8')).schemaVersion, '1.1.0');
+    assert.equal(JSON.parse(await readFile(reportPath, 'utf8')).schemaVersion, '1.2.0');
   } finally {
     await rm(root, { recursive: true, force: true });
   }

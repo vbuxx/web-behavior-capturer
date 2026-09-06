@@ -60,11 +60,12 @@ async function loadVisuals() {
 }
 
 async function loadTimeline() {
-  const page = await json(`/api/timeline?limit=100&byteBudget=65536${selectedRevision ? `&revisionId=${encodeURIComponent(selectedRevision)}` : ''}`);
+  const mode = document.querySelector('#timeline-mode').value;
+  const page = await json(`/api/timeline?mode=${encodeURIComponent(mode)}&limit=100&byteBudget=65536${selectedRevision ? `&revisionId=${encodeURIComponent(selectedRevision)}` : ''}`);
   timeline.replaceChildren();
   for (const point of page.points) {
     const row = document.createElement('tr');
-    appendTextCell(row, Number(point.time).toFixed(1));
+    appendTextCell(row, mode === 'scroll' && point.progress !== null ? Number(point.progress).toFixed(3) : Number(point.time).toFixed(1));
     appendTextCell(row, point.type);
     appendTextCell(row, point.source);
     appendTextCell(row, point.targetRef);
@@ -166,6 +167,7 @@ async function load() {
 
 async function loadRevisions() {
   const page = await json('/api/revisions');
+  revisionSelect.querySelectorAll('option:not(:first-child)').forEach((option) => option.remove());
   for (const revision of page.revisions) {
     const option = document.createElement('option');
     option.value = revision.revisionId;
@@ -177,19 +179,35 @@ async function loadRevisions() {
 
 document.querySelector('#reload').addEventListener('click', () => void loadEvidence().catch((cause) => { error.textContent = cause.message; }));
 document.querySelector('#reload-timeline').addEventListener('click', () => void loadTimeline().catch((cause) => { error.textContent = cause.message; }));
+document.querySelector('#timeline-mode').addEventListener('change', () => void loadTimeline().catch((cause) => { error.textContent = cause.message; }));
 revisionSelect.addEventListener('change', () => { selectedRevision = revisionSelect.value; behaviors.replaceChildren(); metrics.replaceChildren(); targets.replaceChildren(); void load(); });
 document.querySelector('#annotation-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const note = document.querySelector('#annotation-note').value;
-  fetch('/api/annotations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note }) })
+  const edgeId = document.querySelector('#annotation-edge').value.trim();
+  const edgeClass = document.querySelector('#annotation-class').value;
+  const edgeCorrection = edgeId ? { edgeId, ...(edgeClass ? { class: edgeClass } : {}) } : undefined;
+  fetch('/api/annotations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note, ...(edgeCorrection ? { edgeCorrection } : {}) }) })
     .then((response) => response.ok ? response.json() : response.json().then((payload) => Promise.reject(new Error(payload.error))))
     .then(() => { document.querySelector('#annotation-note').value = ''; return loadAnnotations(); })
     .catch((cause) => { error.textContent = cause.message; });
 });
 document.querySelector('#run-probe').addEventListener('click', () => {
-  fetch('/api/probe', { method: 'POST' })
+  const resetRecipeId = document.querySelector('#probe-recipe').value.trim();
+  const maxRuns = Number(document.querySelector('#probe-max-runs').value);
+  fetch('/api/probe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resetRecipeId, maxRuns, baseRevisionId: selectedRevision || undefined }) })
     .then((response) => response.ok ? response.json() : response.json().then((payload) => Promise.reject(new Error(payload.error))))
-    .then((job) => { probeStatus.textContent = JSON.stringify(job, null, 2); })
+    .then(async (job) => {
+      probeStatus.textContent = JSON.stringify(job, null, 2);
+      if (job.jobId) {
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          const current = await json(`/api/probe/${encodeURIComponent(job.jobId)}`);
+          probeStatus.textContent = JSON.stringify(current, null, 2);
+          if (['completed', 'failed', 'cancelled'].includes(current.status)) { await loadRevisions(); break; }
+        }
+      }
+    })
     .catch((cause) => { error.textContent = cause.message; });
 });
 void loadRevisions().then(() => { selectedRevision = revisionSelect.value; return load(); }).catch((cause) => { error.textContent = cause.message; });

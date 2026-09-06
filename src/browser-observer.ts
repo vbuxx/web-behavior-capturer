@@ -74,11 +74,16 @@ export async function installPageObserver(context: BrowserContext, maxRecords = 
 
       document.addEventListener('scroll', (event) => {
         const source = event.target instanceof Element ? event.target : document.scrollingElement;
+        const maxScroll = source instanceof Element
+          ? Math.max(1, source.scrollHeight - source.clientHeight)
+          : Math.max(1, document.documentElement.scrollHeight - innerHeight);
+        const offset = source instanceof Element ? source.scrollTop : window.scrollY;
         push('input', 'scroll', event.target, {
           scrollX: window.scrollX,
           scrollY: window.scrollY,
           containerRef: source instanceof HTMLElement && source !== document.body && source !== document.documentElement ? source.getAttribute('data-wbc-id') ?? source.tagName.toLowerCase() : 'viewport',
-          containerScrollTop: source instanceof Element ? source.scrollTop : window.scrollY,
+          containerScrollTop: offset,
+          containerProgress: Math.max(0, Math.min(1, offset / maxScroll)),
           containerScrollLeft: source instanceof Element ? source.scrollLeft : window.scrollX,
         });
       }, true);

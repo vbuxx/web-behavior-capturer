@@ -337,7 +337,13 @@ export async function verifyPhase0(contractFile: string, options: VerifyOptions 
     const context = await browser.newContext({ viewport: suite.viewport, reducedMotion: 'no-preference' });
     await context.addInitScript('globalThis.__name = globalThis.__name || ((target) => target);');
     const checks: VerificationCheck[] = [];
-    const scenarios = options.scenarioIds ? suite.scenarios.filter((scenario) => options.scenarioIds?.includes(scenario.scenarioId)) : suite.scenarios;
+    let scenarios = suite.scenarios;
+    if (options.scenarioIds) {
+      const available = new Set(suite.scenarios.map((scenario) => scenario.scenarioId));
+      const missing = options.scenarioIds.filter((scenarioId) => !available.has(scenarioId));
+      if (missing.length > 0) throw new Error(`Unknown verification scenario(s): ${missing.join(', ')}`);
+      scenarios = suite.scenarios.filter((scenario) => options.scenarioIds?.includes(scenario.scenarioId));
+    }
     for (const scenario of scenarios) {
       const page = await context.newPage();
       await page.goto(targetUrl, { waitUntil: 'networkidle' });

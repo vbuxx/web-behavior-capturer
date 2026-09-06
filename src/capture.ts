@@ -297,6 +297,7 @@ function timeBehavior(
       });
       return {
         property,
+        composition: 'replace' as const,
         from: property === 'opacity' ? before.style.opacity : before.style.transform,
         to: property === 'opacity' ? after.style.opacity : after.style.transform,
         keyframes,

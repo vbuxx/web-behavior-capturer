@@ -85,6 +85,11 @@ export interface ElementRef {
     preferredStrategy: 'data_attribute' | 'id' | 'role';
     matchCount: number;
   };
+  scope?: {
+    kind: 'document' | 'open_shadow';
+    hostRef?: string;
+    shadowPath?: string[];
+  };
 }
 
 export interface TimeTimeline {
@@ -97,7 +102,7 @@ export interface TimeTimeline {
 
 export interface ScrollTimeline {
   domain: 'scroll';
-  containerRef: 'viewport';
+  containerRef: string;
   axis: 'y';
   range: {
     start: { value: number; unit: 'px' };
@@ -110,6 +115,8 @@ export interface StyleSample {
   progress?: number;
   elapsedMs?: number;
   scrollY?: number;
+  containerOffsetPx?: number;
+  containerProgress?: number;
   opacity: number;
   transform: string;
   x: number;
@@ -129,6 +136,7 @@ export interface Behavior {
   timeline: TimeTimeline | ScrollTimeline;
   tracks: Array<{
     property: string;
+    composition?: 'replace' | 'add' | 'accumulate' | 'unknown';
     from: string | number;
     to: string | number;
     keyframes: Array<{ offset: number | null; easing: string; value: string | number }>;

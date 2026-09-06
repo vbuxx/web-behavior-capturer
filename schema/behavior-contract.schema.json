@@ -266,6 +266,16 @@
             "preferredStrategy": { "enum": ["data_attribute", "id", "role"] },
             "matchCount": { "type": "integer", "minimum": 1 }
           }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["document", "open_shadow"] },
+            "hostRef": { "type": "string", "minLength": 1 },
+            "shadowPath": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
         }
       }
     },
@@ -276,6 +286,8 @@
         "progress": { "type": "number" },
         "elapsedMs": { "type": "number" },
         "scrollY": { "type": "number" },
+        "containerOffsetPx": { "type": "number" },
+        "containerProgress": { "type": "number", "minimum": 0, "maximum": 1 },
         "opacity": { "type": "number" },
         "transform": { "type": "string" },
         "x": { "type": "number" },
@@ -300,7 +312,7 @@
       "required": ["domain", "containerRef", "axis", "range", "scrub"],
       "properties": {
         "domain": { "const": "scroll" },
-        "containerRef": { "const": "viewport" },
+        "containerRef": { "type": "string", "minLength": 1 },
         "axis": { "const": "y" },
         "range": {
           "type": "object",
@@ -350,6 +362,7 @@
             "required": ["property", "from", "to", "keyframes", "samples"],
             "properties": {
               "property": { "type": "string" },
+              "composition": { "enum": ["replace", "add", "accumulate", "unknown"] },
               "from": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "to": { "anyOf": [{ "type": "string" }, { "type": "number" }] },
               "keyframes": {
