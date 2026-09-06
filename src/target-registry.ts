@@ -576,7 +576,7 @@ export class TargetRegistry {
           });
         }
       }
-      const streamedCount = records.filter((candidate) => candidate.targetId === registered.targetId).length;
+      const streamedCount = [...this.#streamedRecords, ...this.#streamQueue].filter((candidate) => candidate.targetId === registered.targetId).length;
       const droppedRecords = (observer?.droppedRecords ?? 0) + (this.#streamDroppedByTarget.get(registered.targetId) ?? 0);
       const failed = !observer;
       const archived = registered.lifecycleStatus !== 'active';
@@ -641,7 +641,7 @@ export class TargetRegistry {
         coverageStart: 'runtime',
         collector: {
           status: failed ? 'failed' : 'installed',
-          recordCount: records.filter((candidate) => candidate.targetId === registered.targetId).length + (observer?.records.length ?? 0),
+          recordCount: [...this.#streamedRecords, ...this.#streamQueue].filter((candidate) => candidate.targetId === registered.targetId).length + (observer?.records.length ?? 0),
           droppedRecords,
           knownLoss: droppedRecords > 0,
         },
