@@ -11,6 +11,7 @@ export interface QuotaBenchmarkResult {
   childExitCode: number | null;
   childExitSignal: string | null;
   finalOutputFileCount: number;
+  finalOutputFiles: string[];
   stagingDirectoryCount: number;
   rejectedByIntegrity: boolean;
   rejectionMessage: string;
@@ -27,6 +28,16 @@ async function fileCount(directory: string): Promise<number> {
     count += entry.isDirectory() ? await fileCount(join(directory, entry.name)) : 1;
   }
   return count;
+}
+
+async function filesIn(directory: string): Promise<string[]> {
+  const files: string[] = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...await filesIn(path));
+    else files.push(path);
+  }
+  return files;
 }
 
 async function stagingDirectories(outputDirectory: string): Promise<string[]> {
@@ -69,8 +80,10 @@ export async function benchmarkFileSizeQuota(quotaBlocks = 256): Promise<QuotaBe
   // rename, and an existing destination would turn a quota failure into a
   // misleading EEXIST path. A failed capture may leave no destination at all.
   let finalOutputFileCount = 0;
+  let finalOutputFiles: string[] = [];
   try {
     finalOutputFileCount = await fileCount(outputDirectory);
+    finalOutputFiles = await filesIn(outputDirectory);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
@@ -83,6 +96,7 @@ export async function benchmarkFileSizeQuota(quotaBlocks = 256): Promise<QuotaBe
     childExitCode: exit.code,
     childExitSignal: exit.signal,
     finalOutputFileCount,
+    finalOutputFiles,
     stagingDirectoryCount: staging.length,
     rejectedByIntegrity,
     rejectionMessage,

@@ -7,7 +7,7 @@ test('fails closed under a child file-size quota', { timeout: 45_000 }, async ()
   const result = await benchmarkFileSizeQuota(128);
   assert.equal(result.quotaBytes, 65_536);
   assert.notEqual(result.childExitCode, 0);
-  assert.equal(result.finalOutputFileCount, 0);
+  assert.equal(result.finalOutputFileCount, 0, JSON.stringify(result));
   assert.equal(result.stagingDirectoryCount, 0);
   assert.equal(result.rejectedByIntegrity, true);
 });
