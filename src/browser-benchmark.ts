@@ -1,7 +1,11 @@
 import { chromium } from 'playwright';
+import { mkdtemp, readdir, rm, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { installPageObserver, measureFrameIntervals, readPageObserver } from './browser-observer.js';
 import { startFixtureServer } from './server.js';
-import { benchmarkCaptureFinalization } from './capture-benchmark.js';
+import { captureSession } from './capture.js';
+import { querySessionBehaviors } from './session-index.js';
 
 export interface BrowserLoadBenchmark {
   iterations: number;
@@ -195,67 +199,83 @@ export interface EnduranceBenchmark {
   nodeCount: number;
   trackCount: number;
   observerDroppedRecords: number;
+  criticalDroppedRecords: number;
+  nonCriticalDroppedRecords: number;
+  coalescedRecords: number;
+  queuePeak: number;
   peakJsHeapBytes: number;
   peakDomNodes: number;
   peakPrivateMemoryBytes: number;
   peakHostRssBytes: number;
+  browserProcessTreeRssBytes: number | null;
+  packageSizeBytes: number;
+  queryP95Ms: number;
   packageValid: boolean;
   packageFinalizationMs: number;
   packageSchemaVersion: string;
   packageKnownLoss: boolean;
 }
 
+async function directorySize(root: string): Promise<number> {
+  let total = 0;
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    const path = join(root, entry.name);
+    total += entry.isDirectory() ? await directorySize(path) : (await stat(path)).size;
+  }
+  return total;
+}
+
+function percentile(values: number[], fraction: number): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  return Number((sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * fraction) - 1)] ?? 0).toFixed(3));
+}
+
 export async function benchmarkSyntheticEndurance(durationMs = 300_000): Promise<EnduranceBenchmark> {
   if (!Number.isInteger(durationMs) || durationMs < 1_000 || durationMs > 3_600_000) throw new Error('Endurance duration must be an integer from 1000 to 3600000 ms');
-  const server = await startFixtureServer();
-  const browser = await chromium.launch({ headless: true });
-  let nodeCount = 0;
-  let trackCount = 0;
-  let observerDroppedRecords = 0;
-  let peakPrivateMemoryBytes = 0;
+  const root = await mkdtemp(join(tmpdir(), 'wbc-endurance-'));
+  const outputDirectory = join(root, 'package');
+  let rssTimer: NodeJS.Timeout | undefined;
   let peakHostRssBytes = process.memoryUsage().rss;
-  let peakJsHeapBytes = 0;
-  let peakDomNodes = 0;
   try {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-    await installPageObserver(context, 20_000);
-    const page = await context.newPage();
-    await page.goto(`${server.url}/load/`, { waitUntil: 'networkidle' });
-    await page.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__?: { ready: boolean; crossOriginReady: boolean } }).__WBC_LOAD__?.ready === true);
-    await page.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__: { crossOriginReady: boolean } }).__WBC_LOAD__.crossOriginReady === true);
-    const info = await page.evaluate(() => (globalThis as unknown as { __WBC_LOAD__: { nodes: number; tracks: number } }).__WBC_LOAD__);
-    nodeCount = info.nodes;
-    trackCount = info.tracks;
-    const cdp = await context.newCDPSession(page);
-    const rssTimer = setInterval(() => { peakHostRssBytes = Math.max(peakHostRssBytes, process.memoryUsage().rss); }, 100);
-    let runtime: RuntimeLoadSample;
-    try {
-      runtime = await runRuntimeBurst(page, cdp, durationMs);
-    } finally {
-      clearInterval(rssTimer);
+    rssTimer = setInterval(() => { peakHostRssBytes = Math.max(peakHostRssBytes, process.memoryUsage().rss); }, 100);
+    const started = performance.now();
+    const result = await captureSession(outputDirectory, { enduranceDurationMs: durationMs, overheadRuns: 1 });
+    const finalizationMs = result.finalizationMs ?? (performance.now() - started - durationMs);
+    const targetCoverage = result.contract.manifest.targetCoverage;
+    const observerDroppedRecords = targetCoverage.reduce((sum, target) => sum + target.collector.droppedRecords, 0);
+    const streaming = result.contract.manifest.quality.streaming;
+    const queryDurations: number[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      const queryStarted = performance.now();
+      await querySessionBehaviors(outputDirectory, { limit: 100 });
+      queryDurations.push(performance.now() - queryStarted);
     }
-    peakJsHeapBytes = Math.round(runtime.peakJsHeapBytes);
-    peakDomNodes = Math.round(runtime.peakDomNodes);
-    peakPrivateMemoryBytes = Math.round(await processPrivateMemory(cdp));
-    observerDroppedRecords = (await readPageObserver(page)).droppedRecords;
-    await context.close();
+    const packageSizeBytes = await directorySize(outputDirectory);
+    const endurance = result.endurance;
+    if (!endurance) throw new Error('Capture did not return endurance metrics');
+    return {
+      durationMs,
+      nodeCount: endurance.nodeCount,
+      trackCount: endurance.trackCount,
+      observerDroppedRecords,
+      criticalDroppedRecords: observerDroppedRecords,
+      nonCriticalDroppedRecords: 0,
+      coalescedRecords: streaming?.coalescedRecords ?? 0,
+      queuePeak: streaming?.queuePeak ?? 0,
+      peakJsHeapBytes: endurance.peakJsHeapBytes,
+      peakDomNodes: endurance.peakDomNodes,
+      peakPrivateMemoryBytes: 0,
+      peakHostRssBytes,
+      browserProcessTreeRssBytes: null,
+      packageSizeBytes,
+      queryP95Ms: percentile(queryDurations, 0.95),
+      packageValid: result.contract.schemaVersion === '1.6.0' && !result.contract.manifest.quality.knownLoss,
+      packageFinalizationMs: Number(finalizationMs.toFixed(3)),
+      packageSchemaVersion: result.contract.schemaVersion,
+      packageKnownLoss: result.contract.manifest.quality.knownLoss,
+    };
   } finally {
-    await browser.close();
-    await server.close();
+    if (rssTimer) clearInterval(rssTimer);
+    await rm(root, { recursive: true, force: true });
   }
-  const packageResult = await benchmarkCaptureFinalization(1);
-  return {
-    durationMs,
-    nodeCount,
-    trackCount,
-    observerDroppedRecords,
-    peakJsHeapBytes,
-    peakDomNodes,
-    peakPrivateMemoryBytes,
-    peakHostRssBytes,
-    packageValid: packageResult.contractSchemaVersion === '1.6.0' && !packageResult.quality.knownLoss,
-    packageFinalizationMs: packageResult.finalizationMs,
-    packageSchemaVersion: packageResult.contractSchemaVersion,
-    packageKnownLoss: packageResult.quality.knownLoss,
-  };
 }

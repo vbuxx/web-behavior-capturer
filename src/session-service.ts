@@ -1,6 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { cp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
 import { captureSession, CaptureCancelledError } from './capture.js';
 import { inspectSessionPackage, querySessionBehaviors, querySessionRecords, type SessionRecordQuery } from './session-index.js';
 import { validateContract, validateSessionIndexManifest } from './validate.js';
@@ -12,8 +15,15 @@ import { validateEvidenceGraph } from './evidence-graph-validate.js';
 import type { EvidenceGraph } from './evidence-graph.js';
 import { compileEvidenceGraph } from './evidence-graph.js';
 import type { EvidenceRecord } from './types.js';
+import { createAnnotationRevision } from './annotation-revision.js';
 
-export type ServiceJobStatus = 'queued' | 'running' | 'finalizing' | 'completed' | 'cancelled' | 'failed';
+export type ServiceJobStatus = 'queued' | 'running' | 'stopping' | 'finalizing' | 'completed' | 'cancelled' | 'failed';
+
+export interface ServiceJobError {
+  name: string;
+  message: string;
+  stage: string;
+}
 
 export interface ServiceJob {
   jobId: string;
@@ -22,8 +32,12 @@ export interface ServiceJob {
   createdAt: string;
   updatedAt: string;
   outputPath?: string;
+  parameters?: Record<string, unknown>;
+  cancelRequestedAt?: string;
+  heartbeatAt?: string;
+  workerPid?: number;
   result?: Record<string, unknown>;
-  error?: { name: string; message: string; stage: string };
+  error?: ServiceJobError;
 }
 
 export interface ImmutableSnapshot {
@@ -41,59 +55,112 @@ export interface SessionServiceOptions {
 
 class LocalJobStore {
   readonly #path: string;
-  #writeQueue: Promise<void> = Promise.resolve();
-
   constructor(path: string) { this.#path = resolve(path); }
+  get path(): string { return this.#path; }
 
-  async #read(): Promise<ServiceJob[]> {
-    try { return JSON.parse(await readFile(this.#path, 'utf8')) as ServiceJob[]; }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
-      throw error;
-    }
+  #database(): DatabaseSync {
+    const database = new DatabaseSync(this.#path);
+    database.exec(`
+      PRAGMA journal_mode = WAL;
+      CREATE TABLE IF NOT EXISTS jobs (
+        job_id TEXT PRIMARY KEY,
+        operation TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        output_path TEXT,
+        parameters_json TEXT,
+        cancel_requested_at TEXT,
+        heartbeat_at TEXT,
+        worker_pid INTEGER,
+        result_json TEXT,
+        error_json TEXT
+      );
+    `);
+    return database;
   }
 
-  async #write(jobs: ServiceJob[]): Promise<void> {
-    await mkdir(dirname(this.#path), { recursive: true });
-    const temporary = `${this.#path}.tmp-${randomUUID()}`;
-    await writeFile(temporary, `${JSON.stringify(jobs, null, 2)}\n`, 'utf8');
-    await rename(temporary, this.#path);
+  #fromRow(row: Record<string, unknown>): ServiceJob {
+    return {
+      jobId: String(row.job_id), operation: String(row.operation), status: row.status as ServiceJobStatus,
+      createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+      ...(row.output_path ? { outputPath: String(row.output_path) } : {}),
+      ...(row.parameters_json ? { parameters: JSON.parse(String(row.parameters_json)) as Record<string, unknown> } : {}),
+      ...(row.cancel_requested_at ? { cancelRequestedAt: String(row.cancel_requested_at) } : {}),
+      ...(row.heartbeat_at ? { heartbeatAt: String(row.heartbeat_at) } : {}),
+      ...(row.worker_pid ? { workerPid: Number(row.worker_pid) } : {}),
+      ...(row.result_json ? { result: JSON.parse(String(row.result_json)) as Record<string, unknown> } : {}),
+      ...(row.error_json ? { error: JSON.parse(String(row.error_json)) as ServiceJobError } : {}),
+    };
   }
 
-  async create(operation: string): Promise<ServiceJob> {
+  async create(operation: string, parameters: Record<string, unknown> = {}): Promise<ServiceJob> {
     const job: ServiceJob = {
       jobId: randomUUID(), operation, status: 'queued',
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      parameters,
     };
-    await this.update(() => job, job.jobId);
+    await mkdir(dirname(this.#path), { recursive: true });
+    const database = this.#database();
+    try {
+      database.prepare(`INSERT INTO jobs (job_id, operation, status, created_at, updated_at, parameters_json) VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(job.jobId, job.operation, job.status, job.createdAt, job.updatedAt, JSON.stringify(parameters));
+    } finally { database.close(); }
     return job;
   }
 
   async get(jobId: string): Promise<ServiceJob> {
-    const job = (await this.#read()).find((candidate) => candidate.jobId === jobId);
-    if (!job) throw new Error(`Unknown job: ${jobId}`);
-    return job;
+    await mkdir(dirname(this.#path), { recursive: true });
+    const database = this.#database();
+    try {
+      const row = database.prepare('SELECT * FROM jobs WHERE job_id = ?').get(jobId) as Record<string, unknown> | undefined;
+      if (!row) throw new Error(`Unknown job: ${jobId}`);
+      return this.#fromRow(row);
+    } finally { database.close(); }
   }
 
   async update(mutator: (job: ServiceJob | undefined) => ServiceJob, jobId: string): Promise<ServiceJob> {
-    let result!: ServiceJob;
-    this.#writeQueue = this.#writeQueue.then(async () => {
-      const jobs = await this.#read();
-      const index = jobs.findIndex((candidate) => candidate.jobId === jobId);
-      result = mutator(index >= 0 ? jobs[index] : undefined);
-      if (index >= 0) jobs[index] = result; else jobs.push(result);
-      await this.#write(jobs);
-    });
-    await this.#writeQueue;
-    return result;
+    await mkdir(dirname(this.#path), { recursive: true });
+    const database = this.#database();
+    try {
+      database.exec('BEGIN IMMEDIATE');
+      const row = database.prepare('SELECT * FROM jobs WHERE job_id = ?').get(jobId) as Record<string, unknown> | undefined;
+      const result = mutator(row ? this.#fromRow(row) : undefined);
+      database.prepare(`
+        INSERT INTO jobs (job_id, operation, status, created_at, updated_at, output_path, parameters_json, cancel_requested_at, heartbeat_at, worker_pid, result_json, error_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(job_id) DO UPDATE SET
+          operation=excluded.operation, status=excluded.status, created_at=excluded.created_at, updated_at=excluded.updated_at,
+          output_path=excluded.output_path, parameters_json=excluded.parameters_json, cancel_requested_at=excluded.cancel_requested_at,
+          heartbeat_at=excluded.heartbeat_at, worker_pid=excluded.worker_pid, result_json=excluded.result_json, error_json=excluded.error_json
+      `).run(
+        result.jobId, result.operation, result.status, result.createdAt, result.updatedAt, result.outputPath ?? null,
+        JSON.stringify(result.parameters ?? {}), result.cancelRequestedAt ?? null, result.heartbeatAt ?? null,
+        result.workerPid ?? null, result.result ? JSON.stringify(result.result) : null, result.error ? JSON.stringify(result.error) : null,
+      );
+      database.exec('COMMIT');
+      return result;
+    } catch (error) {
+      try { database.exec('ROLLBACK'); } catch { /* transaction may not have started */ }
+      throw error;
+    } finally { database.close(); }
+  }
+
+  async requestCancellation(jobId: string): Promise<ServiceJob> {
+    return this.update((current) => {
+      if (!current) throw new Error(`Unknown job: ${jobId}`);
+      if (['completed', 'cancelled', 'failed'].includes(current.status)) return current;
+      return { ...current, status: 'stopping', cancelRequestedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    }, jobId);
   }
 }
 
 function serviceStatus(state: CaptureSessionState): ServiceJobStatus {
   if (state === 'running') return 'running';
+  if (state === 'stopping') return 'stopping';
   if (state === 'finalizing') return 'finalizing';
   if (state === 'completed') return 'completed';
-  if (state === 'cancelled' || state === 'stopping') return 'cancelled';
+  if (state === 'cancelled') return 'cancelled';
   return 'failed';
 }
 
@@ -104,40 +171,69 @@ export class SessionService {
 
   constructor(options: SessionServiceOptions = {}) {
     this.#workspaceRoot = resolve(options.workspaceRoot ?? process.cwd());
-    this.#jobs = new LocalJobStore(options.jobStorePath ?? resolve(this.#workspaceRoot, '.wbc/jobs.json'));
+    this.#jobs = new LocalJobStore(options.jobStorePath ?? resolve(this.#workspaceRoot, '.wbc/jobs.sqlite'));
   }
 
   async status(jobId: string): Promise<ServiceJob> { return this.#jobs.get(jobId); }
 
-  async startCapture(options: { outputPath?: string; maxRecords?: number; visualPolicyPath?: string; resumedFromSessionId?: string; resumeCheckpoint?: string } = {}): Promise<ServiceJob> {
+  async startCapture(options: { outputPath?: string; maxRecords?: number; visualPolicyPath?: string; resumedFromSessionId?: string; resumeCheckpoint?: string; resumePackagePath?: string } = {}): Promise<ServiceJob> {
     const job = await this.#jobs.create('capture.start');
     const outputPath = resolve(this.#workspaceRoot, options.outputPath ?? `.wbc/sessions/${job.jobId}`);
-    const controller = new AbortController();
-    this.#controllers.set(job.jobId, controller);
-    void captureSession(outputPath, {
-      signal: controller.signal,
-      ...(options.maxRecords ? { maxPageRecords: options.maxRecords } : {}),
-      ...(options.visualPolicyPath ? { visualPolicyPath: resolve(this.#workspaceRoot, options.visualPolicyPath) } : {}),
-      ...(options.resumedFromSessionId ? { resumedFromSessionId: options.resumedFromSessionId } : {}),
-      ...(options.resumeCheckpoint ? { resumeCheckpoint: options.resumeCheckpoint } : {}),
-      onStateChange: (state) => { void this.#jobs.update((current) => ({ ...(current ?? job), status: serviceStatus(state), updatedAt: new Date().toISOString(), outputPath }), job.jobId); },
-    }).then((result) => this.#jobs.update((current) => ({ ...(current ?? job), status: 'completed', updatedAt: new Date().toISOString(), outputPath, result: { sessionId: result.contract.manifest.sessionId, behaviors: result.contract.behaviors.length } }), job.jobId))
-      .catch((error: unknown) => this.#jobs.update((current) => ({
-        ...(current ?? job),
-        status: error instanceof CaptureCancelledError ? 'cancelled' : 'failed',
-        updatedAt: new Date().toISOString(),
-        outputPath,
-        error: { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error), stage: 'capture' },
-      }), job.jobId))
-      .finally(() => { this.#controllers.delete(job.jobId); });
-    return { ...job, status: 'running', outputPath };
+    const parameters = { ...options, outputPath };
+    await this.#jobs.update((current) => ({ ...(current ?? job), status: 'running', updatedAt: new Date().toISOString(), outputPath, parameters }), job.jobId);
+    const cliPath = fileURLToPath(new URL('./cli.ts', import.meta.url));
+    const worker = spawn(process.execPath, ['--import', 'tsx/esm', cliPath, 'capture-worker', '--job', job.jobId], {
+      cwd: this.#workspaceRoot,
+      env: { ...process.env, WBC_WORKSPACE_ROOT: this.#workspaceRoot, WBC_JOB_STORE: this.#jobs.path },
+      detached: true,
+      stdio: 'ignore',
+    });
+    worker.unref();
+    return this.#jobs.update((current) => ({ ...(current ?? job), status: 'running', updatedAt: new Date().toISOString(), outputPath, ...(worker.pid ? { workerPid: worker.pid } : {}) }), job.jobId);
   }
 
   async stopCapture(jobId: string): Promise<ServiceJob> {
     const controller = this.#controllers.get(jobId);
-    if (!controller) return this.#jobs.get(jobId);
-    controller.abort();
-    return this.#jobs.get(jobId);
+    const job = await this.#jobs.requestCancellation(jobId);
+    controller?.abort();
+    return job;
+  }
+
+  async runCaptureWorker(jobId: string): Promise<void> {
+    const initial = await this.#jobs.get(jobId);
+    const parameters = initial.parameters ?? {};
+    const outputPath = String(parameters.outputPath ?? initial.outputPath ?? resolve(this.#workspaceRoot, `.wbc/sessions/${jobId}`));
+    const controller = new AbortController();
+    this.#controllers.set(jobId, controller);
+    let polling = true;
+    const poll = async (): Promise<void> => {
+      if (!polling) return;
+      const current = await this.#jobs.get(jobId);
+      if (current.cancelRequestedAt) controller.abort();
+      await this.#jobs.update((latest) => ({ ...(latest ?? initial), heartbeatAt: new Date().toISOString(), updatedAt: new Date().toISOString() }), jobId);
+    };
+    const timer = setInterval(() => { void poll().catch(() => undefined); }, 100);
+    try {
+      const result = await captureSession(outputPath, {
+        signal: controller.signal,
+        ...(typeof parameters.maxRecords === 'number' ? { maxPageRecords: parameters.maxRecords } : {}),
+        ...(typeof parameters.visualPolicyPath === 'string' ? { visualPolicyPath: resolve(this.#workspaceRoot, parameters.visualPolicyPath) } : {}),
+        ...(typeof parameters.resumedFromSessionId === 'string' ? { resumedFromSessionId: parameters.resumedFromSessionId } : {}),
+        ...(typeof parameters.resumeCheckpoint === 'string' ? { resumeCheckpoint: parameters.resumeCheckpoint } : {}),
+        ...(typeof parameters.resumePackagePath === 'string' ? { resumePackagePath: resolve(this.#workspaceRoot, parameters.resumePackagePath) } : {}),
+        onStateChange: (state) => { void this.#jobs.update((current) => ({ ...(current ?? initial), status: serviceStatus(state), updatedAt: new Date().toISOString(), outputPath }), jobId); },
+      });
+      await this.#jobs.update((current) => ({ ...(current ?? initial), status: 'completed', updatedAt: new Date().toISOString(), outputPath, result: { sessionId: result.contract.manifest.sessionId, behaviors: result.contract.behaviors.length } }), jobId);
+    } catch (error) {
+      await this.#jobs.update((current) => ({
+        ...(current ?? initial), status: error instanceof CaptureCancelledError ? 'cancelled' : 'failed', updatedAt: new Date().toISOString(), outputPath,
+        error: { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error), stage: 'capture' },
+      }), jobId);
+    } finally {
+      polling = false;
+      clearInterval(timer);
+      this.#controllers.delete(jobId);
+    }
   }
 
   async #snapshot(packagePath: string, revisionId?: string): Promise<ImmutableSnapshot> {
@@ -309,6 +405,17 @@ export class SessionService {
       })
       .catch((error: unknown) => this.#jobs.update((current) => ({ ...(current ?? job), status: 'failed', updatedAt: new Date().toISOString(), outputPath, error: { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error), stage: 'probe' } }), job.jobId));
     return { ...job, status: 'running', outputPath };
+  }
+
+  async createAnnotation(packagePath: string, input: { note: string; targetRef?: string; evidenceRefs?: string[] }): Promise<{ revisionId: string; contractPath: string; graphPath: string }> {
+    if (!input.note.trim()) throw new Error('Annotation note must not be empty');
+    return createAnnotationRevision(resolve(this.#workspaceRoot, packagePath), {
+      annotationId: randomUUID(),
+      createdAt: new Date().toISOString(),
+      note: input.note,
+      ...(input.targetRef ? { targetRef: input.targetRef } : {}),
+      ...(input.evidenceRefs ? { evidenceRefs: input.evidenceRefs } : {}),
+    });
   }
 
   async verifyReplica(packagePath: string): Promise<ServiceJob> {

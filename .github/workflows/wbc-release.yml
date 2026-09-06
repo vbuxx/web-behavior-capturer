@@ -1,0 +1,55 @@
+name: WBC Release Gates
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+jobs:
+  integrity-stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      WBC_QUOTA_ROOT: ${{ github.workspace }}/.wbc-ci-quota
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: sudo mkdir -p "$WBC_QUOTA_ROOT"
+      - run: sudo mount -t tmpfs -o size=128m tmpfs "$WBC_QUOTA_ROOT"
+      - run: sudo chown "$USER" "$WBC_QUOTA_ROOT"
+      - run: pnpm run test:stress
+      - if: always()
+        run: uname -a && df -h "$WBC_QUOTA_ROOT"
+
+  performance-endurance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run test:performance
+      - run: pnpm run test:endurance
+      - if: always()
+        run: uname -a && node --version && pnpm --version

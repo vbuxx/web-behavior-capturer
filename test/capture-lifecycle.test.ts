@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
@@ -48,10 +48,18 @@ test('cancellation during browser capture closes the page and never promotes sta
 test('resume metadata requires a checkpoint and creates a new session revision', { timeout: 45_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'wbc-resume-'));
   try {
-    await assert.rejects(captureSession(join(root, 'invalid'), { resumedFromSessionId: 'session-old' }), /checkpoint reference/);
-    const result = await captureSession(join(root, 'resumed'), { resumedFromSessionId: 'session-old', resumeCheckpoint: 'host-42', overheadRuns: 1 });
-    assert.equal(result.contract.manifest.resumedFromSessionId, 'session-old');
-    assert.notEqual(result.contract.manifest.sessionId, 'session-old');
+    await assert.rejects(captureSession(join(root, 'invalid'), { resumedFromSessionId: 'session-old', resumeCheckpoint: 'host-42' }), /source package/);
+    const source = await captureSession(join(root, 'source'), { overheadRuns: 1 });
+    const checkpoint = JSON.parse((await readFile(join(root, 'source', 'evidence', 'events.jsonl'), 'utf8')).split('\n').find(Boolean)!) as { id: string };
+    const result = await captureSession(join(root, 'resumed'), {
+      resumedFromSessionId: source.contract.manifest.sessionId,
+      resumePackagePath: join(root, 'source'),
+      resumeCheckpoint: checkpoint.id,
+      overheadRuns: 1,
+    });
+    assert.equal(result.contract.manifest.resumedFromSessionId, source.contract.manifest.sessionId);
+    assert.equal(result.contract.manifest.resumeCheckpoint, checkpoint.id);
+    assert.notEqual(result.contract.manifest.sessionId, source.contract.manifest.sessionId);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

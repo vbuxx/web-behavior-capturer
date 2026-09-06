@@ -4,7 +4,7 @@ import { join, relative, resolve } from 'node:path';
 import { chromium, type Browser, type CDPSession, type Page } from 'playwright';
 import { installPageObserver, measureFrameIntervals } from './browser-observer.js';
 import { startFixtureServer } from './server.js';
-import { buildSessionIndex } from './session-index.js';
+import { buildSessionIndex, inspectSessionPackage } from './session-index.js';
 import { TargetRegistry } from './target-registry.js';
 import { Redactor } from './redaction.js';
 import { validateContract } from './validate.js';
@@ -567,6 +567,14 @@ export interface CaptureResult {
   sessionIndexPath: string;
   sessionIndexManifestPath: string;
   contract: ContractPackage;
+  finalizationMs?: number;
+  endurance?: {
+    durationMs: number;
+    nodeCount: number;
+    trackCount: number;
+    peakJsHeapBytes: number;
+    peakDomNodes: number;
+  };
 }
 
 export interface CaptureOptions {
@@ -577,6 +585,8 @@ export interface CaptureOptions {
   visualPolicyPath?: string;
   resumedFromSessionId?: string;
   resumeCheckpoint?: string;
+  resumePackagePath?: string;
+  enduranceDurationMs?: number;
 }
 
 export class CaptureCancelledError extends Error {
@@ -587,11 +597,24 @@ export class CaptureCancelledError extends Error {
 }
 
 export async function captureSession(outputDirectory: string, options: CaptureOptions = {}): Promise<CaptureResult> {
-  if (options.resumedFromSessionId && !options.resumeCheckpoint) throw new Error('Resume requires a checkpoint reference');
-  if (options.resumeCheckpoint && !options.resumedFromSessionId) throw new Error('Resume checkpoint requires resumedFromSessionId');
+  const hasResume = Boolean(options.resumedFromSessionId || options.resumeCheckpoint || options.resumePackagePath);
+  if (hasResume && (!options.resumedFromSessionId || !options.resumeCheckpoint || !options.resumePackagePath)) {
+    throw new Error('Resume requires source package, source session ID, and checkpoint reference');
+  }
+  if (options.resumePackagePath) {
+    await inspectSessionPackage(resolve(options.resumePackagePath));
+    const sourceContract = JSON.parse(await readFile(resolve(options.resumePackagePath, 'behavior-contract.json'), 'utf8')) as ContractPackage;
+    if (sourceContract.manifest.sessionId !== options.resumedFromSessionId) throw new Error('Resume source session ID does not match package');
+    const sourceEvidence = await readFile(resolve(options.resumePackagePath, 'evidence', 'events.jsonl'), 'utf8');
+    if (!sourceEvidence.split('\n').filter(Boolean).some((line) => line.includes(`"id":"${options.resumeCheckpoint}"`))) {
+      throw new Error(`Resume checkpoint not found: ${options.resumeCheckpoint}`);
+    }
+  }
   const absoluteOutput = resolve(outputDirectory);
   const stagingDirectory = `${absoluteOutput}.staging-${randomUUID()}`;
   let promoted = false;
+  let endurance: CaptureResult['endurance'];
+  let finalizationMs: number | undefined;
   let state: CaptureSessionState = 'running';
   const setState = (next: CaptureSessionState): void => {
     state = next;
@@ -670,10 +693,16 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
       recorder.record('cdp', 'animation-domain-failed', { message: error instanceof Error ? error.message : String(error) });
     }
 
-    await page.goto(server.url, { waitUntil: 'networkidle' });
+    const enduranceOnly = options.enduranceDurationMs !== undefined;
+    let behaviors: Behavior[] = [];
+    await page.goto(enduranceOnly ? `${server.url}/load/` : server.url, { waitUntil: 'networkidle' });
     throwIfCancelled();
+    if (enduranceOnly) {
+      await page.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__?: { ready: boolean; crossOriginReady: boolean } }).__WBC_LOAD__?.ready === true);
+      await page.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__?: { crossOriginReady: boolean } }).__WBC_LOAD__?.crossOriginReady === true);
+    } else {
     await page.waitForFunction(() => (window as unknown as { __WBC_FIXTURE__?: { ready: boolean } }).__WBC_FIXTURE__?.ready === true);
-    const behaviors = [
+    behaviors = [
       await captureHover(page, recorder, visualDirectory),
       await captureCssAnimation(page, recorder, visualDirectory),
       await captureInterruptedTransition(page, recorder, visualDirectory),
@@ -715,6 +744,50 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     await lifecycleDetach;
     recorder.record('input', 'target-lifecycle-detach-requested', { from: '/lifecycle-b/' });
 
+    }
+    if (options.enduranceDurationMs !== undefined) {
+      if (!Number.isInteger(options.enduranceDurationMs) || options.enduranceDurationMs < 1_000 || options.enduranceDurationMs > 3_600_000) {
+        throw new Error('Endurance duration must be an integer from 1000 to 3600000 ms');
+      }
+      if (!enduranceOnly) {
+        await page.goto(`${server.url}/load/`, { waitUntil: 'networkidle' });
+        await page.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__?: { ready: boolean; crossOriginReady: boolean } }).__WBC_LOAD__?.ready === true);
+        await page.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__?: { crossOriginReady: boolean } }).__WBC_LOAD__?.crossOriginReady === true);
+      }
+      const loadInfo = await page.evaluate(() => (globalThis as unknown as { __WBC_LOAD__: { nodes: number; tracks: number } }).__WBC_LOAD__);
+      await cdp.send('Performance.enable');
+      const started = performance.now();
+      let step = 0;
+      let peakJsHeapBytes = 0;
+      let peakDomNodes = 0;
+      while (performance.now() - started < options.enduranceDurationMs) {
+        throwIfCancelled();
+        await page.evaluate((nextStep) => {
+          const maxScroll = Math.max(0, document.documentElement.scrollHeight - innerHeight);
+          scrollTo(0, (nextStep % 20) * (maxScroll / 19));
+          document.dispatchEvent(new PointerEvent('pointermove', {
+            bubbles: true,
+            clientX: nextStep % Math.max(innerWidth, 1),
+            clientY: nextStep % Math.max(innerHeight, 1),
+          }));
+        }, step);
+        step += 1;
+        const metrics = await cdp.send('Performance.getMetrics');
+        const values = new Map(metrics.metrics.map((metric) => [metric.name, metric.value]));
+        peakJsHeapBytes = Math.max(peakJsHeapBytes, values.get('JSHeapUsedSize') ?? 0);
+        peakDomNodes = Math.max(peakDomNodes, values.get('Nodes') ?? 0);
+        await page.waitForTimeout(100);
+      }
+      endurance = {
+        durationMs: options.enduranceDurationMs,
+        nodeCount: loadInfo.nodes,
+        trackCount: loadInfo.tracks,
+        peakJsHeapBytes: Math.round(peakJsHeapBytes),
+        peakDomNodes: Math.round(peakDomNodes),
+      };
+      recorder.record('input', 'endurance-completed', { ...endurance });
+    }
+
     await targetRegistry.stopStreaming();
     const targets = await targetRegistry.collect();
     for (const { targetId, record } of targets.records) recorder.ingest(record, targetId);
@@ -747,6 +820,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     const degradation = baselineP95 === 0 ? 0 : ((captureP95 - baselineP95) / baselineP95) * 100;
     const sessionId = randomUUID();
     const browserVersion = browser.version();
+    const finalizationStarted = performance.now();
     setState('finalizing');
     throwIfCancelled();
     const contract: ContractPackage = {
@@ -759,7 +833,8 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
         generatedAt: new Date().toISOString(),
         status: 'completed',
         ...(options.resumedFromSessionId ? { resumedFromSessionId: options.resumedFromSessionId } : {}),
-        source: { url: redactor.redact(server.url, 'url'), fixture: 'phase0' },
+        ...(options.resumeCheckpoint ? { resumeCheckpoint: options.resumeCheckpoint } : {}),
+        source: { url: redactor.redact(server.url, 'url'), fixture: enduranceOnly ? 'load' : 'phase0' },
         environment: {
           browserName: RUNTIME_PROFILE.browser, browserVersion, chromiumRevision: RUNTIME_PROFILE.chromiumRevision, platform: process.platform,
           viewport: RUNTIME_PROFILE.viewport, deviceScaleFactor: RUNTIME_PROFILE.deviceScaleFactor,
@@ -825,7 +900,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           'MCP returns bounded summaries and provenance; raw event streams remain outside agent prompts.',
           'Host-streaming preserves critical records and only coalesces pointer/scroll under backpressure; any host drop is explicit in quality metrics.',
           'Visual masking is selector-based; arbitrary sensitive text without a configured selector has no OCR coverage.',
-          ...(options.resumeCheckpoint ? [`Capture resumed from checkpoint ${options.resumeCheckpoint}.`] : []),
+        ...(options.resumeCheckpoint ? [`Capture resumed from checkpoint ${options.resumeCheckpoint}.`] : []),
         ],
       },
       elements,
@@ -833,6 +908,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
       evidenceIndex,
     };
 
+    setState('finalizing');
     const graph = compileEvidenceGraph(contract, recorder.records);
     await validateEvidenceGraph(graph);
     const evidenceGraphPath = join(stagingDirectory, 'evidence-graph.json');
@@ -848,6 +924,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`, 'utf8');
     injectCaptureFailure('before-index');
     await buildSessionIndex(stagingDirectory, contractPath, contract, recorder.records, evidenceGraphPath);
+    finalizationMs = Number((performance.now() - finalizationStarted).toFixed(3));
     await context.close();
     await rename(stagingDirectory, absoluteOutput);
     promoted = true;
@@ -859,6 +936,8 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
       sessionIndexPath: join(absoluteOutput, 'session.sqlite'),
       sessionIndexManifestPath: join(absoluteOutput, 'session-index.json'),
       contract,
+      ...(finalizationMs !== undefined ? { finalizationMs } : {}),
+      ...(endurance ? { endurance } : {}),
     };
   } catch (error) {
     if (error instanceof CaptureCancelledError || options.signal?.aborted) {

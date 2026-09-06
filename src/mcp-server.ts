@@ -18,7 +18,10 @@ async function dispatch(service: SessionService, method: string, params: Record<
   if (method === 'capture.start') {
     const outputPath = stringParam(params, 'outputPath', false);
     const visualPolicyPath = stringParam(params, 'visualPolicyPath', false);
-    return service.startCapture({ ...(outputPath ? { outputPath } : {}), ...(visualPolicyPath ? { visualPolicyPath } : {}), ...(typeof params.maxRecords === 'number' ? { maxRecords: params.maxRecords } : {}) });
+    const resumePackagePath = stringParam(params, 'resumePackagePath', false);
+    const resumedFromSessionId = stringParam(params, 'resumedFromSessionId', false);
+    const resumeCheckpoint = stringParam(params, 'resumeCheckpoint', false);
+    return service.startCapture({ ...(outputPath ? { outputPath } : {}), ...(visualPolicyPath ? { visualPolicyPath } : {}), ...(resumePackagePath ? { resumePackagePath } : {}), ...(resumedFromSessionId ? { resumedFromSessionId } : {}), ...(resumeCheckpoint ? { resumeCheckpoint } : {}), ...(typeof params.maxRecords === 'number' ? { maxRecords: params.maxRecords } : {}) });
   }
   if (method === 'capture.status') return service.status(stringParam(params, 'jobId')!);
   if (method === 'capture.stop') return service.stopCapture(stringParam(params, 'jobId')!);
@@ -28,6 +31,7 @@ async function dispatch(service: SessionService, method: string, params: Record<
   if (method === 'revision.list') return service.listRevisions(stringParam(params, 'packagePath')!);
   if (method === 'evidence.graph.get') return service.getEvidenceGraph(stringParam(params, 'packagePath')!, typeof params.revisionId === 'string' ? params.revisionId : undefined);
   if (method === 'probe.run') return service.runProbe(typeof params.packagePath === 'string' ? params.packagePath : 'artifacts/phase1/latest');
+  if (method === 'annotation.create') return service.createAnnotation(stringParam(params, 'packagePath')!, { note: stringParam(params, 'note')!, ...(typeof params.targetRef === 'string' ? { targetRef: params.targetRef } : {}), ...(Array.isArray(params.evidenceRefs) ? { evidenceRefs: params.evidenceRefs.filter((value): value is string => typeof value === 'string') } : {}) });
   if (method === 'replica.verify') return service.verifyReplica(stringParam(params, 'packagePath')!);
   if (method === 'capture.export') return service.exportCapture(stringParam(params, 'sourcePath')!, stringParam(params, 'destinationPath')!);
   throw new Error(`Unknown MCP method: ${method}`);

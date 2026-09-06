@@ -164,9 +164,10 @@ export interface CaptureManifest {
   probeRun?: { path: string; sha256: string };
   status?: CaptureSessionState;
   resumedFromSessionId?: string;
+  resumeCheckpoint?: string;
   source: {
     url: string;
-    fixture: 'phase0';
+    fixture: 'phase0' | 'load';
   };
   environment: {
     browserName: string;
@@ -207,6 +208,7 @@ export interface CaptureManifest {
       flushIntervalMs: number;
       batchSize: number;
       queueCapacity: number;
+      queuePeak?: number;
       coalescedRecordTypes: string[];
       batchCount?: number;
       coalescedRecords?: number;

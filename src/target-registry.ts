@@ -97,6 +97,7 @@ export interface TargetRegistrySnapshot {
     flushIntervalMs: number;
     batchSize: number;
     queueCapacity: number;
+    queuePeak: number;
     coalescedRecordTypes: string[];
     batchCount: number;
     coalescedRecords: number;
@@ -153,6 +154,7 @@ export class TargetRegistry {
   #streamHostDroppedRecords = 0;
   #streamDroppedByTarget = new Map<string, number>();
   #streamingConfig = { flushIntervalMs: 50, batchSize: 128, queueCapacity: 10_000 };
+  #streamPeakQueue = 0;
 
   constructor(page: Page, maxRecords = 10_000) {
     this.#page = page;
@@ -216,6 +218,7 @@ export class TargetRegistry {
       return;
     }
     this.#streamQueue.push(record);
+    this.#streamPeakQueue = Math.max(this.#streamPeakQueue, this.#streamQueue.length);
     if (this.#streamQueue.length >= this.#streamingConfig.batchSize) this.#flushStreamingQueue();
   }
 
@@ -660,6 +663,7 @@ export class TargetRegistry {
         flushIntervalMs: this.#streamingConfig.flushIntervalMs,
         batchSize: this.#streamingConfig.batchSize,
         queueCapacity: this.#streamingConfig.queueCapacity,
+        queuePeak: this.#streamPeakQueue,
         coalescedRecordTypes: ['pointerover', 'pointerout', 'scroll'],
         batchCount: this.#streamBatchCount,
         coalescedRecords: this.#streamCoalescedRecords,

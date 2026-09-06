@@ -18,7 +18,7 @@
       "properties": {
         "targets": { "type": "integer", "minimum": 1 },
         "elements": { "type": "integer", "minimum": 1 },
-        "behaviors": { "type": "integer", "minimum": 1 },
+        "behaviors": { "type": "integer", "minimum": 0 },
         "evidence": { "type": "integer", "minimum": 1 },
         "records": { "type": "integer", "minimum": 0 }
       }
