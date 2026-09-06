@@ -32,18 +32,18 @@ jobs:
       - run: sudo chown "$USER" "$WBC_QUOTA_ROOT"
       - name: Run integrity and stress gates
         run: |
-          mkdir -p .wbc-release-report
+          mkdir -p wbc-release-report
           set -o pipefail
-          pnpm run test:stress 2>&1 | tee .wbc-release-report/stress.log
+          pnpm run test:stress 2>&1 | tee wbc-release-report/stress.log
       - if: always()
         run: |
-          uname -a | tee .wbc-release-report/runner.txt
-          df -h "$WBC_QUOTA_ROOT" | tee -a .wbc-release-report/runner.txt
+          uname -a | tee wbc-release-report/runner.txt
+          df -h "$WBC_QUOTA_ROOT" | tee -a wbc-release-report/runner.txt
       - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wbc-release-integrity-${{ github.run_id }}
-          path: .wbc-release-report
+          path: wbc-release-report
           if-no-files-found: warn
 
   performance-endurance:
@@ -63,18 +63,18 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - name: Run performance and endurance gates
         run: |
-          mkdir -p .wbc-release-report
+          mkdir -p wbc-release-report
           set -o pipefail
-          pnpm run test:performance 2>&1 | tee .wbc-release-report/performance.log
-          pnpm run test:endurance 2>&1 | tee .wbc-release-report/endurance.log
+          pnpm run test:performance 2>&1 | tee wbc-release-report/performance.log
+          pnpm run test:endurance 2>&1 | tee wbc-release-report/endurance.log
       - if: always()
         run: |
-          uname -a | tee .wbc-release-report/runner.txt
-          node --version | tee -a .wbc-release-report/runner.txt
-          pnpm --version | tee -a .wbc-release-report/runner.txt
+          uname -a | tee wbc-release-report/runner.txt
+          node --version | tee -a wbc-release-report/runner.txt
+          pnpm --version | tee -a wbc-release-report/runner.txt
       - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wbc-release-performance-${{ github.run_id }}
-          path: .wbc-release-report
+          path: wbc-release-report
           if-no-files-found: warn
