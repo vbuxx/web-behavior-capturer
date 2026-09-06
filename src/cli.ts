@@ -36,10 +36,14 @@ async function main(): Promise<void> {
     const outputPath = option('--out');
     const maxRecords = option('--max-records');
     const visualPolicyPath = option('--visual-policy');
+    const resumedFromSessionId = option('--resumed-from-session');
+    const resumeCheckpoint = option('--resume-checkpoint');
     console.log(JSON.stringify(await service.startCapture({
       ...(outputPath ? { outputPath } : {}),
       ...(maxRecords ? { maxRecords: Number(maxRecords) } : {}),
       ...(visualPolicyPath ? { visualPolicyPath } : {}),
+      ...(resumedFromSessionId ? { resumedFromSessionId } : {}),
+      ...(resumeCheckpoint ? { resumeCheckpoint } : {}),
     }), null, 2));
     return;
   }
@@ -109,21 +113,24 @@ async function main(): Promise<void> {
     const packagePath = option('--package') ?? 'artifacts/phase1/latest';
     if (command === 'behavior-list') {
       const kind = option('--kind');
-      console.log(JSON.stringify(await service.listBehaviors(packagePath, { ...(kind ? { kind: kind as never } : {}), ...(option('--limit') ? { limit: Number(option('--limit')) } : {}), ...(option('--offset') ? { offset: Number(option('--offset')) } : {}) }), null, 2));
+      const revisionId = option('--revision-id');
+      console.log(JSON.stringify(await service.listBehaviors(packagePath, { ...(kind ? { kind: kind as never } : {}), ...(option('--limit') ? { limit: Number(option('--limit')) } : {}), ...(option('--offset') ? { offset: Number(option('--offset')) } : {}), ...(revisionId ? { revisionId } : {}) }), null, 2));
     } else if (command === 'behavior-get') {
       const behaviorId = option('--behavior') ?? process.argv[3];
       if (!behaviorId) throw new Error('--behavior is required');
-      console.log(JSON.stringify(await service.getBehavior(packagePath, behaviorId), null, 2));
+      console.log(JSON.stringify(await service.getBehavior(packagePath, behaviorId, option('--revision-id')), null, 2));
     } else {
       const type = option('--type');
       const limit = option('--limit');
       const byteBudget = option('--byte-budget');
       const cursor = option('--cursor');
+      const revisionId = option('--revision-id');
       console.log(JSON.stringify(await service.getEvidence(packagePath, {
         ...(type ? { type } : {}),
         ...(limit ? { limit: Number(limit) } : {}),
         ...(byteBudget ? { byteBudget: Number(byteBudget) } : {}),
         ...(cursor ? { cursor } : {}),
+        ...(revisionId ? { revisionId } : {}),
       }), null, 2));
     }
     return;
@@ -212,13 +219,30 @@ async function main(): Promise<void> {
     const { evaluatePhase2 } = await import('./evaluation.js');
     const packageDirectory = resolve(option('--package') ?? 'artifacts/phase1/latest');
     const report = resolve(option('--out') ?? '.wbc/evaluation/phase2-report.json');
-    console.log(JSON.stringify(await evaluatePhase2(packageDirectory, report, Number(option('--repetitions') ?? 3)), null, 2));
+    const agentCommand = option('--agent-command');
+    const taskId = option('--task');
+    const condition = option('--condition');
+    const timeoutMs = option('--timeout-ms');
+    const evidenceByteBudget = option('--evidence-byte-budget');
+    console.log(JSON.stringify(await evaluatePhase2(packageDirectory, report, Number(option('--repetitions') ?? 3), {
+      ...(agentCommand ? { agentCommand } : {}),
+      ...(taskId ? { taskId } : {}),
+      ...(condition ? { condition: condition as 'screenshot' | 'trace' | 'wbc' } : {}),
+      ...(timeoutMs ? { timeoutMs: Number(timeoutMs) } : {}),
+      ...(evidenceByteBudget ? { evidenceByteBudget: Number(evidenceByteBudget) } : {}),
+    }), null, 2));
     return;
   }
 
   if (command === 'browser-benchmark') {
     const { benchmarkSyntheticBrowser } = await import('./browser-benchmark.js');
     console.log(JSON.stringify(await benchmarkSyntheticBrowser(Number(option('--iterations') ?? 2)), null, 2));
+    return;
+  }
+
+  if (command === 'endurance-benchmark') {
+    const { benchmarkSyntheticEndurance } = await import('./browser-benchmark.js');
+    console.log(JSON.stringify(await benchmarkSyntheticEndurance(Number(option('--duration-ms') ?? 300_000)), null, 2));
     return;
   }
 
@@ -243,7 +267,7 @@ async function main(): Promise<void> {
   if (command === 'cleanup-staging') {
     const { cleanupStagingOrphans } = await import('./staging.js');
     const output = resolve(option('--out') ?? '.wbc/phase1');
-    console.log(JSON.stringify(await cleanupStagingOrphans(output, Number(option('--max-age-ms') ?? 86_400_000)), null, 2));
+    console.log(JSON.stringify(await cleanupStagingOrphans(output, Number(option('--max-age-ms') ?? 86_400_000), { apply: process.argv.includes('--apply') }), null, 2));
     return;
   }
 
@@ -276,14 +300,14 @@ async function main(): Promise<void> {
   if (command === 'prune-archives') {
     const { pruneVerifiedArchives } = await import('./archive-retention.js');
     const archiveDirectory = resolve(option('--archive-dir') ?? '.wbc/archive');
-    console.log(JSON.stringify(await pruneVerifiedArchives(archiveDirectory, Number(option('--keep') ?? 5)), null, 2));
+    console.log(JSON.stringify(await pruneVerifiedArchives(archiveDirectory, Number(option('--keep') ?? 5), { apply: process.argv.includes('--apply') }), null, 2));
     return;
   }
 
   if (command === 'cleanup-rotation') {
     const { cleanupRotationStaging } = await import('./rotation-staging.js');
     const archiveDirectory = resolve(option('--archive-dir') ?? '.wbc/archive');
-    console.log(JSON.stringify(await cleanupRotationStaging(archiveDirectory, Number(option('--max-age-ms') ?? 86_400_000)), null, 2));
+    console.log(JSON.stringify(await cleanupRotationStaging(archiveDirectory, Number(option('--max-age-ms') ?? 86_400_000), { apply: process.argv.includes('--apply') }), null, 2));
     return;
   }
 
@@ -295,7 +319,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error('Usage: tsx src/cli.ts <capture|capture-start|capture-status|capture-stop|capture-export|verify|replica-verify|probe|probe-run|inspect|query|evidence|behavior-list|behavior-get|evidence-get|review|benchmark|evaluate|browser-benchmark|capture-benchmark|reliability-benchmark|crash-benchmark|cleanup-staging|failure-benchmark|corruption-benchmark|rotate-package|rotation-recover|quota-benchmark|prune-archives|cleanup-rotation> [--out PATH] [--source PATH] [--destination PATH] [--package PATH] [--archive-dir PATH] [--job ID] [--behavior ID] [--repetitions N] [--keep N] [--apply] [--quota-blocks N] [--copy-fallback] [--visual-policy PATH] [--port N] [--parallel N] [--cycles N] [--kill-after-ms N] [--max-age-ms N] [--iterations N] [--synthetic] [--records N] [--evidence-mb N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
+  console.error('Usage: tsx src/cli.ts <capture|capture-start|capture-status|capture-stop|capture-export|verify|replica-verify|probe|probe-run|inspect|query|evidence|behavior-list|behavior-get|evidence-get|review|benchmark|evaluate|browser-benchmark|endurance-benchmark|capture-benchmark|reliability-benchmark|crash-benchmark|cleanup-staging|failure-benchmark|corruption-benchmark|rotate-package|rotation-recover|quota-benchmark|prune-archives|cleanup-rotation> [--out PATH] [--source PATH] [--destination PATH] [--package PATH] [--archive-dir PATH] [--job ID] [--behavior ID] [--revision-id ID] [--repetitions N] [--keep N] [--apply] [--agent-command CMD] [--condition screenshot|trace|wbc] [--task ID] [--timeout-ms N] [--evidence-byte-budget N] [--quota-blocks N] [--copy-fallback] [--visual-policy PATH] [--port N] [--parallel N] [--cycles N] [--kill-after-ms N] [--max-age-ms N] [--iterations N] [--duration-ms N] [--synthetic] [--records N] [--evidence-mb N] [--kind KIND] [--source-target ID] [--type TYPE] [--target-ref REF] [--from-source-time MS] [--to-source-time MS] [--limit N] [--offset N] [--byte-budget N] [--cursor CURSOR] [--target reference|replica] [--scenarios PATH] [--max-records N] [--overhead-runs N]');
   process.exitCode = 2;
 }
 

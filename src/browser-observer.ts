@@ -29,11 +29,17 @@ export async function installPageObserver(context: BrowserContext, maxRecords = 
     };
 
     const targetRef = (target: EventTarget | null): string | undefined => {
-      if (!(target instanceof Element)) return undefined;
-      const element = target.closest('[data-wbc-id]');
+      const element = target instanceof Element
+        ? target.closest('[data-wbc-id]')
+        : null;
       return element instanceof HTMLElement && element.dataset.wbcId
         ? `nav-1:main:${element.dataset.wbcId}`
         : undefined;
+    };
+
+    const eventTarget = (event: Event): EventTarget | null => {
+      const shadowTarget = event.composedPath().find((candidate) => candidate instanceof Element);
+      return shadowTarget instanceof Element ? shadowTarget : event.target;
     };
 
     const push = (source: 'input' | 'page', type: string, target: EventTarget | null, payload: Record<string, unknown>) => {
@@ -62,15 +68,23 @@ export async function installPageObserver(context: BrowserContext, maxRecords = 
           const pointer = event instanceof PointerEvent
             ? { clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType }
             : {};
-          push('input', type, event.target, pointer);
+          push('input', type, eventTarget(event), pointer);
         }, true);
       }
 
       document.addEventListener('scroll', (event) => {
-        push('input', 'scroll', event.target, { scrollX: window.scrollX, scrollY: window.scrollY });
+        const source = event.target instanceof Element ? event.target : document.scrollingElement;
+        push('input', 'scroll', event.target, {
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          containerRef: source instanceof HTMLElement && source !== document.body && source !== document.documentElement ? source.getAttribute('data-wbc-id') ?? source.tagName.toLowerCase() : 'viewport',
+          containerScrollTop: source instanceof Element ? source.scrollTop : window.scrollY,
+          containerScrollLeft: source instanceof Element ? source.scrollLeft : window.scrollX,
+        });
       }, true);
 
-      const observer = new MutationObserver((mutations) => {
+      const observeMutations = (root: Node): void => {
+        const observer = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           push('page', 'mutation', mutation.target, {
             mutationType: mutation.type,
@@ -78,12 +92,20 @@ export async function installPageObserver(context: BrowserContext, maxRecords = 
           });
         }
       });
-      observer.observe(document, {
+        observer.observe(root, {
         attributes: true,
         attributeFilter: ['class', 'style', 'aria-expanded', 'hidden'],
         childList: true,
         subtree: true,
       });
+      };
+      observeMutations(document);
+      const nativeAttachShadow = Element.prototype.attachShadow;
+      Element.prototype.attachShadow = function attachShadow(init: ShadowRootInit): ShadowRoot {
+        const root = nativeAttachShadow.call(this, init);
+        if (init.mode === 'open') observeMutations(root);
+        return root;
+      };
 
       let previous = performance.now();
       const tick = (now: number) => {

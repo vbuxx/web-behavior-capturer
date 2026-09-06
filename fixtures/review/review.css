@@ -11,6 +11,10 @@ section { padding: 36px 0; border-bottom: 1px solid #283140; }
 .metric, .card { min-height: 112px; padding: 18px; border: 1px solid #2d3747; border-radius: 12px; background: #111720cc; }
 .metric strong { display: block; font-size: 2rem; margin-top: 12px; }
 .card code { color: #8fb3ff; overflow-wrap: anywhere; }
+.card { cursor: pointer; }
+.detail { max-height: 320px; overflow: auto; padding: 16px; border: 1px solid #2d3747; border-radius: 12px; background: #0d121a; color: #b9c9e4; white-space: pre-wrap; }
+.revision-picker { display: inline-flex; gap: 8px; align-items: center; color: #98a5b8; font-size: .85rem; }
+select { border: 1px solid #2d3747; border-radius: 8px; padding: 8px; background: #0d121a; color: #e8edf5; }
 .card p, header p, .section-heading p { color: #98a5b8; }
 .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #18362d; color: #8ce2bd; font-size: .75rem; }
 .table-wrap { overflow-x: auto; border: 1px solid #2d3747; border-radius: 12px; }

@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { rm } from 'node:fs/promises';
+import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { chromium } from 'playwright';
 import { startReviewServer } from '../src/review-server.js';
 
 test('serves a verified session through a read-only loopback review UI', { timeout: 30_000 }, async () => {
-  const server = await startReviewServer(join(process.cwd(), 'artifacts/phase1/latest'));
+  const root = await mkdtemp(join(tmpdir(), 'wbc-review-'));
+  const packageRoot = join(root, 'package');
+  await cp(join(process.cwd(), 'artifacts/phase1/latest'), packageRoot, { recursive: true });
+  const server = await startReviewServer(packageRoot);
   try {
     assert.match(server.url, /^http:\/\/127\.0\.0\.1:\d+$/);
 
@@ -43,8 +47,17 @@ test('serves a verified session through a read-only loopback review UI', { timeo
     assert.equal(invalidResponse.status, 400);
     const annotationResponse = await fetch(`${server.url}/api/annotations`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ note: 'reviewed fixture provenance' }) });
     assert.equal(annotationResponse.status, 201);
+    const annotation = await annotationResponse.json() as { revisionId: string };
+    assert.match(annotation.revisionId, /^revision-/);
     const annotationPage = await fetch(`${server.url}/api/annotations`, { headers });
     assert.equal((await annotationPage.json() as { count: number }).count, 1);
+    const revisionsResponse = await fetch(`${server.url}/api/revisions`, { headers });
+    assert.equal(revisionsResponse.status, 200);
+    const revisions = await revisionsResponse.json() as { activeRevisionId: string; revisions: Array<{ revisionId: string }> };
+    assert.equal(revisions.activeRevisionId, annotation.revisionId);
+    assert.ok(revisions.revisions.some((revision) => revision.revisionId === annotation.revisionId));
+    const graphRevisionResponse = await fetch(`${server.url}/api/graph?revisionId=${encodeURIComponent(annotation.revisionId)}`, { headers });
+    assert.equal(graphRevisionResponse.status, 200);
     const methodResponse = await fetch(`${server.url}/api/session`, { method: 'POST', headers });
     assert.equal(methodResponse.status, 405);
 
@@ -67,6 +80,6 @@ test('serves a verified session through a read-only loopback review UI', { timeo
     }
   } finally {
     await server.close();
-    await rm(join(process.cwd(), 'artifacts/phase1/latest/annotations.jsonl'), { force: true });
+    await rm(root, { recursive: true, force: true });
   }
 });

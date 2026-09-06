@@ -13,6 +13,7 @@
         <p class="eyebrow">Website Behavior Capture</p>
         <h1>Session review</h1>
         <p id="session-line">Loading verified package…</p>
+        <label class="revision-picker" for="revision-select">Revision <select id="revision-select"><option value="">base capture</option></select></label>
       </header>
       <section aria-labelledby="summary-title">
         <h2 id="summary-title">Integrity and coverage</h2>
@@ -21,6 +22,7 @@
       <section aria-labelledby="behavior-title">
         <h2 id="behavior-title">Behavior contracts</h2>
         <div class="cards" id="behaviors"></div>
+        <pre class="detail" id="behavior-detail">Select a behavior to inspect its contract.</pre>
       </section>
       <section aria-labelledby="target-title">
         <h2 id="target-title">Capture targets</h2>
@@ -38,6 +40,7 @@
         <h2 id="graph-title">Evidence graph and provenance</h2>
         <p id="graph-summary">Loading graph revision…</p>
         <div class="table-wrap"><table><thead><tr><th>Node kind</th><th>Count</th></tr></thead><tbody id="graph-nodes"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>From</th><th>Class</th><th>To</th><th>Limitation</th></tr></thead><tbody id="graph-edges"></tbody></table></div>
       </section>
       <section aria-labelledby="annotation-title">
         <h2 id="annotation-title">Immutable annotation</h2>

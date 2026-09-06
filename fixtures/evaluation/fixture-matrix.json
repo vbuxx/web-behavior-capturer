@@ -3,11 +3,11 @@
   "fixtures": [
     { "id": "hover-focus-interruption", "status": "supported", "evidence": "fixtures/phase0", "note": "hover and interrupted transition verifier" },
     { "id": "css-waapi", "status": "supported", "evidence": "fixtures/phase0", "note": "CSS keyframe and WAAPI timing" },
-    { "id": "nested-scroller-reverse", "status": "partial", "evidence": "fixtures/phase0", "note": "viewport scroll reveal supported; nested scroller not yet autonomous" },
+    { "id": "nested-scroller-reverse", "status": "partial", "evidence": "test/nested-scroller.test.ts", "note": "nested container progress and reverse events are captured; semantic behavior compiler still targets viewport" },
     { "id": "gsap-boolean-numeric-scrub", "status": "partial", "evidence": "fixtures/phase0", "note": "numeric/direct scrub supported; boolean semantic adapter unknown" },
     { "id": "overlap-composition", "status": "partial", "evidence": "fixtures/phase0", "note": "sampled tracks are available; composition causality is correlated" },
     { "id": "main-navigation-cancellation", "status": "partial", "evidence": "fixtures/probes", "note": "navigation epochs and cancellation cleanup covered; resume is new revision only" },
-    { "id": "open-shadow-dom", "status": "unsupported", "evidence": null, "note": "deferred fixture" },
+    { "id": "open-shadow-dom", "status": "partial", "evidence": "test/open-shadow.test.ts", "note": "open shadow mutation and interaction evidence are captured; semantic behavior compilation is not yet complete" },
     { "id": "oopif", "status": "supported", "evidence": "fixtures/probes", "note": "cross-origin frame and target registry probe" },
     { "id": "worker-lifecycle", "status": "partial", "evidence": "fixtures/probes", "note": "dedicated worker runtime attach; worker-of-worker unavailable" },
     { "id": "network-delayed-state", "status": "partial", "evidence": "fixtures/phase0", "note": "metadata timing only; response body semantics disabled" },

@@ -14,13 +14,13 @@ Lima perilaku yang menjadi exit criterion spike sudah dapat ditangkap dan diveri
 - scroll reveal dengan reverse probe;
 - GSAP ScrollTrigger dengan `scrub: true`.
 
-Fase 0 telah selesai. Fase 1 sekarang membawa target registry, lifecycle lintas navigasi, reopenable session index, structured-data redaction, budgeted evidence query, element identity lintas frame, resolver struktural independen, review UI lokal, serta atomic staging/promotion untuk package capture. Behavior Contract schema 1.5.0 mencatat target/navigation epoch, loss, redaction, locator candidates, bounds, structural fingerprint, dan ambiguity. SQLite sidecar menyediakan query tanpa membuka website sumber.
+Fase 0 telah selesai. Fase 1 sekarang membawa target registry, lifecycle lintas navigasi, reopenable session index, structured-data redaction, budgeted evidence query, element identity lintas frame, resolver struktural independen, review UI lokal, serta atomic staging/promotion untuk package capture. Behavior Contract schema 1.6.0 mencatat target/navigation epoch, lifecycle status, loss, redaction, locator candidates, bounds, structural fingerprint, dan ambiguity. SQLite sidecar menyediakan query tanpa membuka website sumber.
 
 Hasil terbaru tersedia di [artifacts/phase1/latest/behavior-contract.json](artifacts/phase1/latest/behavior-contract.json), [artifacts/phase1/latest/verification-reference.json](artifacts/phase1/latest/verification-reference.json), [artifacts/phase1/latest/verification-replica.json](artifacts/phase1/latest/verification-replica.json), dan [artifacts/phase1/latest/technical-probe-report.json](artifacts/phase1/latest/technical-probe-report.json). Kedua target verifikasi lulus 5/5 dan technical probe diagnostik lulus 10/10. Baseline Fase 0 tetap disimpan di `artifacts/phase0/latest`.
 
 ## Menjalankan
 
-Prasyarat: Node.js 22.5 atau lebih baru dan pnpm. Perintah capture/index menampilkan `ExperimentalWarning` selama `node:sqlite` belum dinyatakan stabil oleh runtime.
+Prasyarat: Node.js 24.14.0 dan pnpm 11.19.0. Perintah capture/index menampilkan `ExperimentalWarning` selama `node:sqlite` belum dinyatakan stabil oleh runtime.
 
 ```bash
 pnpm install
@@ -35,6 +35,7 @@ pnpm run review -- --package artifacts/phase1/latest
 pnpm run benchmark -- --package artifacts/phase1/latest --iterations 3
 pnpm run benchmark:synthetic -- --package artifacts/phase1/latest --records 50000 --evidence-mb 100 --iterations 3
 pnpm run benchmark:browser -- --iterations 2
+pnpm run test:endurance
 pnpm run benchmark:capture -- --overhead-runs 1
 pnpm run evaluate -- --package artifacts/phase1/latest --repetitions 3 --out .wbc/evaluation/phase2-report.json
 pnpm run benchmark:reliability -- --parallel 2 --cycles 1
@@ -45,8 +46,11 @@ pnpm run benchmark:corruption -- --package artifacts/phase1/latest
 pnpm run rotate:package -- --package .wbc/phase1 --archive-dir .wbc/archive
 pnpm run rotate:package -- --package .wbc/phase1 --archive-dir /Volumes/archive/wbc --copy-fallback
 pnpm run benchmark:quota -- --quota-blocks 128
+WBC_QUOTA_ROOT=/path/to/quota-volume pnpm run benchmark:quota -- --quota-blocks 128
 pnpm run prune:archives -- --archive-dir .wbc/archive --keep 5
+pnpm run prune:archives -- --archive-dir .wbc/archive --keep 5 --apply
 pnpm run cleanup:rotation -- --archive-dir .wbc/archive --max-age-ms 86400000
+pnpm run cleanup:rotation -- --archive-dir .wbc/archive --max-age-ms 86400000 --apply
 pnpm run recover:rotation -- --archive-dir .wbc/archive
 pnpm run recover:rotation -- --archive-dir .wbc/archive --apply
 pnpm run verify -- --contract .wbc/phase1/behavior-contract.json --target reference
@@ -61,6 +65,7 @@ pnpm run replica-verify -- --package artifacts/phase1/latest
 pnpm run capture-export -- --source artifacts/phase1/latest --destination .wbc/exported
 printf '%s\n' '{"id":1,"method":"behavior.list","params":{"packagePath":"artifacts/phase1/latest","limit":1}}' | pnpm run mcp
 pnpm test
+pnpm run test:rc
 ```
 
 Untuk membuktikan pelaporan data loss secara manual:

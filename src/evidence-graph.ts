@@ -68,7 +68,7 @@ function recordNode(contract: ContractPackage, record: EvidenceRecord): Evidence
   };
 }
 
-function behaviorStateNode(contract: ContractPackage, behavior: Behavior): EvidenceGraphNode {
+function behaviorStateNode(contract: ContractPackage, behavior: Behavior, records: EvidenceRecord[]): EvidenceGraphNode {
   const evidenceRefs = [...new Set([
     ...behavior.trigger.evidenceRefs,
     ...behavior.provenance.evidenceRefs,
@@ -76,24 +76,28 @@ function behaviorStateNode(contract: ContractPackage, behavior: Behavior): Evide
     ...(behavior.interruption?.evidenceRefs ?? []),
   ])];
   const firstSample = behavior.tracks[0]?.samples[0];
+  const fingerprintRecord = records.find((record) => record.type === 'observable-state-fingerprint'
+    && record.targetRef === behavior.targetRef
+    && record.payload.behaviorId === behavior.behaviorId);
+  const fingerprint = fingerprintRecord?.payload.fingerprint ?? {
+    url: contract.manifest.source.url,
+    focus: null,
+    visibility: 'unknown',
+    relevantAttributes: {},
+    scroll: firstSample?.scrollY ?? null,
+    layoutCheckpoint: firstSample ? { x: firstSample.x, y: firstSample.y, transform: firstSample.transform } : null,
+  };
   return {
     id: `state:${behavior.behaviorId}`,
     kind: 'observable_state',
-    evidenceRefs,
+    evidenceRefs: [...new Set([...evidenceRefs, ...(fingerprintRecord ? [fingerprintRecord.id] : [])])],
     targetRef: behavior.targetRef,
     navigationId: navigationForTarget(contract, behavior.targetRef),
     clockUncertaintyMs: uncertaintyForTarget(contract, behavior.targetRef),
     payload: {
       behaviorId: behavior.behaviorId,
-      fingerprint: {
-        url: contract.manifest.source.url,
-        focus: null,
-        visibility: 'unknown',
-        relevantAttributes: {},
-        scroll: firstSample?.scrollY ?? null,
-        layoutCheckpoint: firstSample ? { x: firstSample.x, y: firstSample.y, transform: firstSample.transform } : null,
-      },
-      limitation: 'Focus, visibility, and attributes are unknown until a state fingerprint checkpoint is captured.',
+      fingerprint,
+      ...(fingerprintRecord ? {} : { limitation: 'Focus, visibility, and attributes are unknown until a state fingerprint checkpoint is captured.' }),
     },
   };
 }
@@ -123,7 +127,7 @@ export function compileEvidenceGraph(contract: ContractPackage, records: Evidenc
     clockUncertaintyMs: null,
     payload: { path: evidence.path, mediaType: evidence.mediaType },
   })));
-  nodes.push(...contract.behaviors.map((behavior) => behaviorStateNode(contract, behavior)));
+  nodes.push(...contract.behaviors.map((behavior) => behaviorStateNode(contract, behavior, records)));
   nodes.push({
     id: 'probe:pending',
     kind: 'probe_run',
@@ -157,7 +161,9 @@ export function compileEvidenceGraph(contract: ContractPackage, records: Evidenc
     edges,
     limitations: [
       'Natural capture does not establish causal edges without intervention; non-direct edges are correlated.',
-      'Observable-state focus, visibility, and relevant attributes are unknown until dedicated fingerprint checkpoints are enabled.',
+    records.some((record) => record.type === 'observable-state-fingerprint')
+      ? 'Fingerprint checkpoints cover the configured behavior targets; focus outside those targets remains out of scope.'
+      : 'Observable-state focus, visibility, and relevant attributes are unknown until dedicated fingerprint checkpoints are enabled.',
       'Probe-run node is a placeholder until a diagnostic probe contributes evidence.',
     ],
   };

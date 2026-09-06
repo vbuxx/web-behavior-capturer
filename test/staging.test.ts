@@ -16,7 +16,10 @@ test('removes only age-expired staging orphans', async () => {
     await writeFile(join(active, 'partial.json'), '{}');
     const old = new Date(Date.now() - 10_000);
     await utimes(expired, old, old);
-    const result = await cleanupStagingOrphans(output, 1_000);
+    const dryRun = await cleanupStagingOrphans(output, 1_000);
+    assert.deepEqual(dryRun.plannedRemovals, [expired]);
+    assert.deepEqual(dryRun.removed, []);
+    const result = await cleanupStagingOrphans(output, 1_000, { apply: true });
     assert.equal(result.scanned, 2);
     assert.deepEqual(result.removed, [expired]);
     assert.deepEqual(result.retained, [active]);

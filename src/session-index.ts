@@ -23,6 +23,7 @@ export interface SessionInspection {
 }
 
 export interface SessionRecordQuery {
+  revisionId?: string;
   sourceTargetId?: string;
   type?: string;
   targetRef?: string;
@@ -337,6 +338,7 @@ export async function querySessionBehaviors(
 
 function querySignature(options: SessionRecordQuery): string {
   return JSON.stringify({
+    revisionId: options.revisionId ?? null,
     sourceTargetId: options.sourceTargetId ?? null,
     type: options.type ?? null,
     targetRef: options.targetRef ?? null,

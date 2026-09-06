@@ -11,6 +11,7 @@ import { validateContract } from './validate.js';
 import { compileEvidenceGraph } from './evidence-graph.js';
 import { validateEvidenceGraph } from './evidence-graph-validate.js';
 import { loadVisualRedactionPolicy, screenshotWithVisualMask, type VisualRedactionPolicy } from './visual-redaction.js';
+import { RUNTIME_PROFILE } from './runtime-profile.js';
 import type {
   Behavior,
   CaptureSessionState,
@@ -204,6 +205,42 @@ async function sampleElement(page: Page, selector: string, extra: Partial<StyleS
       animations,
     };
   }, extra);
+}
+
+async function captureStateFingerprint(page: Page, selector: string, behaviorId: string): Promise<Record<string, unknown>> {
+  return page.locator(selector).evaluate((element, id) => {
+    const style = getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    const active = document.activeElement;
+    const selectorFor = (candidate: Element | null): string | null => {
+      if (!candidate) return null;
+      if (candidate.id) return `#${candidate.id}`;
+      const dataId = candidate.getAttribute('data-wbc-id');
+      return dataId ? `[data-wbc-id="${dataId}"]` : candidate.tagName.toLowerCase();
+    };
+    return {
+      behaviorId: id,
+      fingerprint: {
+        url: location.href,
+        focus: selectorFor(active),
+        visibility: {
+          display: style.display,
+          visibility: style.visibility,
+          opacity: Number(style.opacity),
+          inViewport: rect.bottom > 0 && rect.right > 0 && rect.top < innerHeight && rect.left < innerWidth,
+        },
+        relevantAttributes: {
+          'aria-expanded': element.getAttribute('aria-expanded'),
+          'aria-hidden': element.getAttribute('aria-hidden'),
+          role: element.getAttribute('role'),
+          class: element.getAttribute('class'),
+          'data-wbc-id': element.getAttribute('data-wbc-id'),
+        },
+        scroll: { x: scrollX, y: scrollY },
+        layoutCheckpoint: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, transform: style.transform },
+      },
+    };
+  }, behaviorId);
 }
 
 async function waitForAnimationIdle(page: Page, selector: string, timeoutMs = 1_000): Promise<number> {
@@ -538,6 +575,8 @@ export interface CaptureOptions {
   signal?: AbortSignal;
   onStateChange?: (state: CaptureSessionState) => void;
   visualPolicyPath?: string;
+  resumedFromSessionId?: string;
+  resumeCheckpoint?: string;
 }
 
 export class CaptureCancelledError extends Error {
@@ -548,6 +587,8 @@ export class CaptureCancelledError extends Error {
 }
 
 export async function captureSession(outputDirectory: string, options: CaptureOptions = {}): Promise<CaptureResult> {
+  if (options.resumedFromSessionId && !options.resumeCheckpoint) throw new Error('Resume requires a checkpoint reference');
+  if (options.resumeCheckpoint && !options.resumedFromSessionId) throw new Error('Resume checkpoint requires resumedFromSessionId');
   const absoluteOutput = resolve(outputDirectory);
   const stagingDirectory = `${absoluteOutput}.staging-${randomUUID()}`;
   let promoted = false;
@@ -567,6 +608,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
   const evidenceDirectory = join(stagingDirectory, 'evidence');
   const visualDirectory = join(evidenceDirectory, 'visual');
   await mkdir(visualDirectory, { recursive: true });
+  options.onStateChange?.('running');
 
   const server = await startFixtureServer();
   const browser = await chromium.launch({ headless: true, args: ['--site-per-process'] });
@@ -578,14 +620,20 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
     throwIfCancelled();
     const overhead = await benchmarkObserver(browser, server.url, options.overheadRuns ?? 3);
     const context = await browser.newContext({
-      viewport: { width: 1280, height: 800 },
-      deviceScaleFactor: 1,
-      locale: 'en-US',
-      timezoneId: 'Asia/Jakarta',
-      reducedMotion: 'no-preference',
+      viewport: RUNTIME_PROFILE.viewport,
+      deviceScaleFactor: RUNTIME_PROFILE.deviceScaleFactor,
+      locale: RUNTIME_PROFILE.locale,
+      timezoneId: RUNTIME_PROFILE.timezone,
+      reducedMotion: RUNTIME_PROFILE.reducedMotion,
     });
     await installPageObserver(context, options.maxPageRecords ?? 10_000);
     const page = await context.newPage();
+    const abortHandler = (): void => {
+      if (!options.signal?.aborted) return;
+      setState('stopping');
+      void page.close().catch(() => undefined);
+    };
+    options.signal?.addEventListener('abort', abortHandler, { once: true });
     targetRegistry = new TargetRegistry(page, options.maxPageRecords ?? 10_000);
     targetRegistry.startStreaming({ flushIntervalMs: 50, batchSize: 128, queueCapacity: 10_000 });
     const cdp: CDPSession = await context.newCDPSession(page);
@@ -632,6 +680,17 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
       await captureScrollReveal(page, recorder, visualDirectory),
       await captureGsapScrub(page, recorder, visualDirectory),
     ];
+    const fingerprintSelectors: Array<[string, string]> = [
+      ['hover-card-enter', '#hover-card'],
+      ['css-keyframe-pulse', '#css-animation'],
+      ['interrupted-card-hover', '#interrupt-card'],
+      ['scroll-threshold-reveal', '#scroll-reveal'],
+      ['gsap-scrolltrigger-scrub', '#gsap-scrub'],
+    ];
+    for (const [behaviorId, selector] of fingerprintSelectors) {
+      const targetRef = behaviors.find((behavior) => behavior.behaviorId === behaviorId)?.targetRef;
+      if (targetRef) recorder.record('page', 'observable-state-fingerprint', await captureStateFingerprint(page, selector, behaviorId), targetRef);
+    }
     throwIfCancelled();
 
     await targetRegistry.checkpoint();
@@ -699,11 +758,12 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
         navigationId: 'nav-1',
         generatedAt: new Date().toISOString(),
         status: 'completed',
+        ...(options.resumedFromSessionId ? { resumedFromSessionId: options.resumedFromSessionId } : {}),
         source: { url: redactor.redact(server.url, 'url'), fixture: 'phase0' },
         environment: {
-          browserName: 'chromium', browserVersion, platform: process.platform,
-          viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1,
-          locale: 'en-US', timezone: 'Asia/Jakarta', reducedMotion: 'no-preference',
+          browserName: RUNTIME_PROFILE.browser, browserVersion, chromiumRevision: RUNTIME_PROFILE.chromiumRevision, platform: process.platform,
+          viewport: RUNTIME_PROFILE.viewport, deviceScaleFactor: RUNTIME_PROFILE.deviceScaleFactor,
+          locale: RUNTIME_PROFILE.locale, timezone: RUNTIME_PROFILE.timezone, reducedMotion: RUNTIME_PROFILE.reducedMotion,
         },
         captureMode: 'natural',
         capabilities: [
@@ -722,7 +782,7 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           { name: 'sqlite_session_index', status: 'supported', detail: 'Reopenable sidecar index built with node:sqlite; runtime API is still marked experimental.' },
           { name: 'structured_data_redaction', status: 'supported', detail: 'Sensitive keys, header-style values, bearer tokens, and credential query parameters are redacted before persistence.' },
           { name: 'network_metadata_only', status: 'supported', detail: 'URL, method, status, resource type, and timing only; request/response headers and bodies are disabled.' },
-          { name: 'visual_redaction', status: 'not_attempted', detail: 'Screenshot regions are not OCR-scanned or blurred.' },
+          { name: 'visual_redaction', status: 'supported', detail: 'Configured DOM selectors are masked before PNG persistence; OCR is unavailable.' },
           { name: 'target_scoped_element_registry', status: 'supported', detail: 'Element identity, bounds, locator candidates, and ambiguity are scoped to target and navigation epoch.' },
           { name: 'independent_structural_locator', status: 'supported', detail: 'Verifier scores structural and layout fingerprints and rejects weak or ambiguous matches without requiring shared source IDs.' },
           { name: 'local_review_service', status: 'supported', detail: 'A read-only loopback service exposes verified session, behavior, and budgeted evidence views.' },
@@ -762,9 +822,10 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
           'Network evidence intentionally excludes headers and bodies; request/response payload semantics are unknown.',
           'Locator candidates exclude visible text; ordinal identity for fully ambiguous elements may drift after DOM reordering.',
           'Independent structural resolution is heuristic; major layout reordering or many visually identical candidates can be rejected as ambiguous.',
-          'No MCP server is included; the local viewer is read-only and does not yet render the visual evidence gallery.',
+          'MCP returns bounded summaries and provenance; raw event streams remain outside agent prompts.',
           'Host-streaming preserves critical records and only coalesces pointer/scroll under backpressure; any host drop is explicit in quality metrics.',
-          'Visual redaction summary is explicit but selector masking is not yet enabled for screenshots.',
+          'Visual masking is selector-based; arbitrary sensitive text without a configured selector has no OCR coverage.',
+          ...(options.resumeCheckpoint ? [`Capture resumed from checkpoint ${options.resumeCheckpoint}.`] : []),
         ],
       },
       elements,
@@ -800,7 +861,10 @@ export async function captureSession(outputDirectory: string, options: CaptureOp
       contract,
     };
   } catch (error) {
-    if (error instanceof CaptureCancelledError) setState('cancelled');
+    if (error instanceof CaptureCancelledError || options.signal?.aborted) {
+      setState('cancelled');
+      if (!(error instanceof CaptureCancelledError)) throw new CaptureCancelledError();
+    }
     else setState('failed');
     throw error;
   } finally {

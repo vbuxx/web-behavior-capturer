@@ -44,7 +44,9 @@ export async function benchmarkFileSizeQuota(quotaBlocks = 256): Promise<QuotaBe
   if (!Number.isInteger(quotaBlocks) || quotaBlocks < 64 || quotaBlocks > 16_384) {
     throw new Error('Quota blocks must be an integer from 64 to 16384');
   }
-  const root = await mkdtemp('/tmp/wbc-quota-benchmark-');
+  const quotaRoot = process.env.WBC_QUOTA_ROOT ? resolve(process.env.WBC_QUOTA_ROOT) : '/tmp';
+  await mkdir(quotaRoot, { recursive: true });
+  const root = await mkdtemp(join(quotaRoot, 'wbc-quota-benchmark-'));
   const outputDirectory = join(root, 'capture');
   await mkdir(outputDirectory);
   const cliPath = fileURLToPath(new URL('./cli.ts', import.meta.url));

@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>WBC open shadow fixture</title></head>
+<body data-wbc-ready="true"><main><div id="shadow-host"></div><output id="shadow-state">waiting</output></main>
+<script>
+  const host = document.querySelector('#shadow-host');
+  const root = host.attachShadow({ mode: 'open' });
+  root.innerHTML = '<button data-wbc-id="shadow-button">Open shadow action</button>';
+  const button = root.querySelector('[data-wbc-id="shadow-button"]');
+  button.addEventListener('click', () => { document.querySelector('#shadow-state').textContent = 'clicked'; button.setAttribute('aria-pressed', 'true'); });
+  window.__WBC_OPEN_SHADOW__ = { host, root, button };
+</script></body></html>

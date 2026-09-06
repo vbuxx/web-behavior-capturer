@@ -41,3 +41,6 @@ Chrome headless pada environment ini tidak mengembalikan private-memory process 
 ## Next Gate
 
 Tambahkan peak RSS native process melalui collector OS yang terpisah, sustained animation beberapa menit, dan CDP event volume. Setelah itu bandingkan capture finalization time end-to-end, bukan hanya navigation dan observer frame interval.
+## Endurance follow-up — 6 September 2026
+
+`pnpm run test:endurance` completed a 300,000 ms synthetic run with 5,012 DOM nodes and 50 active tracks. The observer reported zero dropped records; peak JS heap was 4,677,436 bytes and private native memory was unavailable from CDP. A separately finalized and reopened schema 1.6.0 package was valid in 9,156.252 ms with `knownLoss: false`.

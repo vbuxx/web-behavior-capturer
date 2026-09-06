@@ -22,9 +22,11 @@ async function dispatch(service: SessionService, method: string, params: Record<
   }
   if (method === 'capture.status') return service.status(stringParam(params, 'jobId')!);
   if (method === 'capture.stop') return service.stopCapture(stringParam(params, 'jobId')!);
-  if (method === 'behavior.list') return service.listBehaviors(stringParam(params, 'packagePath')!, { ...(typeof params.kind === 'string' ? { kind: params.kind as never } : {}), ...(typeof params.limit === 'number' ? { limit: params.limit } : {}), ...(typeof params.offset === 'number' ? { offset: params.offset } : {}) });
-  if (method === 'behavior.get') return service.getBehavior(stringParam(params, 'packagePath')!, stringParam(params, 'behaviorId')!);
+  if (method === 'behavior.list') return service.listBehaviors(stringParam(params, 'packagePath')!, { ...(typeof params.kind === 'string' ? { kind: params.kind as never } : {}), ...(typeof params.limit === 'number' ? { limit: params.limit } : {}), ...(typeof params.offset === 'number' ? { offset: params.offset } : {}), ...(typeof params.revisionId === 'string' ? { revisionId: params.revisionId } : {}) });
+  if (method === 'behavior.get') return service.getBehavior(stringParam(params, 'packagePath')!, stringParam(params, 'behaviorId')!, typeof params.revisionId === 'string' ? params.revisionId : undefined);
   if (method === 'evidence.get') return service.getEvidence(stringParam(params, 'packagePath')!, params as never);
+  if (method === 'revision.list') return service.listRevisions(stringParam(params, 'packagePath')!);
+  if (method === 'evidence.graph.get') return service.getEvidenceGraph(stringParam(params, 'packagePath')!, typeof params.revisionId === 'string' ? params.revisionId : undefined);
   if (method === 'probe.run') return service.runProbe(typeof params.packagePath === 'string' ? params.packagePath : 'artifacts/phase1/latest');
   if (method === 'replica.verify') return service.verifyReplica(stringParam(params, 'packagePath')!);
   if (method === 'capture.export') return service.exportCapture(stringParam(params, 'sourcePath')!, stringParam(params, 'destinationPath')!);

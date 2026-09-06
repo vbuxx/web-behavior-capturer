@@ -171,6 +171,7 @@ export interface CaptureManifest {
   environment: {
     browserName: string;
     browserVersion: string;
+    chromiumRevision?: string;
     platform: string;
     viewport: { width: number; height: number };
     deviceScaleFactor: number;

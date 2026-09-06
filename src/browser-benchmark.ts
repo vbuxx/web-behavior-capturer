@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import { installPageObserver, measureFrameIntervals, readPageObserver } from './browser-observer.js';
 import { startFixtureServer } from './server.js';
+import { benchmarkCaptureFinalization } from './capture-benchmark.js';
 
 export interface BrowserLoadBenchmark {
   iterations: number;
@@ -186,5 +187,75 @@ export async function benchmarkSyntheticBrowser(iterations = 2): Promise<Browser
     observedWorkerMessages: Math.round(median(observedWorkers)),
     baselineCrossOriginReady: baselineCrossOrigin.every(Boolean),
     observedCrossOriginReady: observedCrossOrigin.every(Boolean),
+  };
+}
+
+export interface EnduranceBenchmark {
+  durationMs: number;
+  nodeCount: number;
+  trackCount: number;
+  observerDroppedRecords: number;
+  peakJsHeapBytes: number;
+  peakDomNodes: number;
+  peakPrivateMemoryBytes: number;
+  peakHostRssBytes: number;
+  packageValid: boolean;
+  packageFinalizationMs: number;
+  packageSchemaVersion: string;
+  packageKnownLoss: boolean;
+}
+
+export async function benchmarkSyntheticEndurance(durationMs = 300_000): Promise<EnduranceBenchmark> {
+  if (!Number.isInteger(durationMs) || durationMs < 1_000 || durationMs > 3_600_000) throw new Error('Endurance duration must be an integer from 1000 to 3600000 ms');
+  const server = await startFixtureServer();
+  const browser = await chromium.launch({ headless: true });
+  let nodeCount = 0;
+  let trackCount = 0;
+  let observerDroppedRecords = 0;
+  let peakPrivateMemoryBytes = 0;
+  let peakHostRssBytes = process.memoryUsage().rss;
+  let peakJsHeapBytes = 0;
+  let peakDomNodes = 0;
+  try {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await installPageObserver(context, 20_000);
+    const page = await context.newPage();
+    await page.goto(`${server.url}/load/`, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__?: { ready: boolean; crossOriginReady: boolean } }).__WBC_LOAD__?.ready === true);
+    await page.waitForFunction(() => (globalThis as unknown as { __WBC_LOAD__: { crossOriginReady: boolean } }).__WBC_LOAD__.crossOriginReady === true);
+    const info = await page.evaluate(() => (globalThis as unknown as { __WBC_LOAD__: { nodes: number; tracks: number } }).__WBC_LOAD__);
+    nodeCount = info.nodes;
+    trackCount = info.tracks;
+    const cdp = await context.newCDPSession(page);
+    const rssTimer = setInterval(() => { peakHostRssBytes = Math.max(peakHostRssBytes, process.memoryUsage().rss); }, 100);
+    let runtime: RuntimeLoadSample;
+    try {
+      runtime = await runRuntimeBurst(page, cdp, durationMs);
+    } finally {
+      clearInterval(rssTimer);
+    }
+    peakJsHeapBytes = Math.round(runtime.peakJsHeapBytes);
+    peakDomNodes = Math.round(runtime.peakDomNodes);
+    peakPrivateMemoryBytes = Math.round(await processPrivateMemory(cdp));
+    observerDroppedRecords = (await readPageObserver(page)).droppedRecords;
+    await context.close();
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  const packageResult = await benchmarkCaptureFinalization(1);
+  return {
+    durationMs,
+    nodeCount,
+    trackCount,
+    observerDroppedRecords,
+    peakJsHeapBytes,
+    peakDomNodes,
+    peakPrivateMemoryBytes,
+    peakHostRssBytes,
+    packageValid: packageResult.contractSchemaVersion === '1.6.0' && !packageResult.quality.knownLoss,
+    packageFinalizationMs: packageResult.finalizationMs,
+    packageSchemaVersion: packageResult.contractSchemaVersion,
+    packageKnownLoss: packageResult.quality.knownLoss,
   };
 }

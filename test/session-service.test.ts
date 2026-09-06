@@ -41,6 +41,11 @@ test('probe job writes a new contract revision without replacing the base contra
     const revision = JSON.parse(await readFile(revisionContract, 'utf8')) as { manifest: { revision?: string; probeRun?: { path: string } } };
     assert.equal(revision.manifest.revision, final.result?.revisionId);
     assert.ok(revision.manifest.probeRun?.path.includes('technical-probe-report.json'));
+    const revisions = await service.listRevisions('package');
+    assert.equal(revisions.activeRevisionId, final.result?.revisionId);
+    const graph = await service.getEvidenceGraph('package', String(final.result?.revisionId));
+    assert.equal(graph.snapshot.revisionId, final.result?.revisionId);
+    assert.ok(graph.graph.nodes.some((node) => node.kind === 'probe_run' && node.id.includes(String(final.result?.revisionId))));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

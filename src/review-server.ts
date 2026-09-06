@@ -8,6 +8,8 @@ import { validateContract, validateSessionIndexManifest } from './validate.js';
 import type { BehaviorKind, ContractPackage } from './types.js';
 import { validateEvidenceGraph } from './evidence-graph-validate.js';
 import type { EvidenceGraph } from './evidence-graph.js';
+import { readRevisionIndex, validateRevision } from './revisions.js';
+import { createAnnotationRevision } from './annotation-revision.js';
 
 const behaviorKinds: BehaviorKind[] = ['hover', 'css_animation', 'interrupted_transition', 'scroll_reveal', 'gsap_scrub'];
 const assets = new Map([
@@ -72,6 +74,15 @@ async function loadVerifiedContract(packageRoot: string): Promise<ContractPackag
   return validateContract(JSON.parse(await readFile(contractPath, 'utf8')));
 }
 
+async function loadSelectedContract(packageRoot: string, revisionId: string | null): Promise<ContractPackage> {
+  if (!revisionId) return loadVerifiedContract(packageRoot);
+  const base = await loadVerifiedContract(packageRoot);
+  const revisions = await readRevisionIndex(packageRoot, base.manifest.sessionId);
+  const entry = revisions.revisions.find((candidate) => candidate.revisionId === revisionId);
+  if (!entry) throw new Error(`Unknown revision: ${revisionId}`);
+  return (await validateRevision(packageRoot, entry)).contract;
+}
+
 export async function startReviewServer(packageDirectory: string, port = 0): Promise<ReviewServer> {
   const packageRoot = resolve(packageDirectory);
   await inspectSessionPackage(packageRoot);
@@ -99,7 +110,11 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
         if (kind && !behaviorKinds.includes(kind as BehaviorKind)) throw new Error(`Unsupported behavior kind: ${kind}`);
         const limit = optionalNumber(url, 'limit');
         const offset = optionalNumber(url, 'offset');
-        const behaviors = await querySessionBehaviors(packageRoot, {
+        const revisionId = url.searchParams.get('revisionId');
+        const selectedContract = await loadSelectedContract(packageRoot, revisionId);
+        const behaviors = revisionId
+          ? selectedContract.behaviors.filter((behavior) => !kind || behavior.kind === kind).slice(Number(url.searchParams.get('offset') ?? 0), Number(url.searchParams.get('offset') ?? 0) + Number(url.searchParams.get('limit') ?? 100)).map(({ behaviorId, kind: behaviorKind, targetRef }) => ({ behaviorId, kind: behaviorKind, targetRef }))
+          : await querySessionBehaviors(packageRoot, {
           ...(kind ? { kind: kind as BehaviorKind } : {}),
           ...(limit !== undefined ? { limit } : {}),
           ...(offset !== undefined ? { offset } : {}),
@@ -107,8 +122,31 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
         writeJson(response, 200, { behaviors, count: behaviors.length });
         return;
       }
+      if (url.pathname.startsWith('/api/behavior/')) {
+        const behaviorId = decodeURIComponent(url.pathname.slice('/api/behavior/'.length));
+        const contract = await loadSelectedContract(packageRoot, url.searchParams.get('revisionId'));
+        const behavior = contract.behaviors.find((candidate) => candidate.behaviorId === behaviorId);
+        if (!behavior) {
+          writeJson(response, 404, { error: 'behavior_not_found' });
+          return;
+        }
+        writeJson(response, 200, behavior);
+        return;
+      }
+      if (url.pathname === '/api/revisions') {
+        const session = await loadVerifiedContract(packageRoot);
+        const revisions = await readRevisionIndex(packageRoot, session.manifest.sessionId);
+        for (const revision of revisions.revisions) await validateRevision(packageRoot, revision);
+        writeJson(response, 200, revisions);
+        return;
+      }
       if (url.pathname === '/api/evidence') {
         const query: SessionRecordQuery = {};
+        const revisionId = url.searchParams.get('revisionId');
+        if (revisionId) {
+          await loadSelectedContract(packageRoot, revisionId);
+          query.revisionId = revisionId;
+        }
         for (const [parameter, field] of [
           ['sourceTargetId', 'sourceTargetId'], ['type', 'type'], ['targetRef', 'targetRef'], ['cursor', 'cursor'],
         ] as const) {
@@ -125,7 +163,7 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
         return;
       }
       if (url.pathname === '/api/visuals') {
-        const contract = await loadVerifiedContract(packageRoot);
+        const contract = await loadSelectedContract(packageRoot, url.searchParams.get('revisionId'));
         const visuals = contract.evidenceIndex
           .filter((entry) => entry.mediaType === 'image/png')
           .map(({ id, path, mediaType, sha256 }) => ({ id, path, mediaType, sha256 }));
@@ -134,6 +172,15 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
       }
       if (url.pathname === '/api/graph') {
         const manifest = await validateSessionIndexManifest(JSON.parse(await readFile(resolve(packageRoot, 'session-index.json'), 'utf8')));
+        const revisionId = url.searchParams.get('revisionId');
+        if (revisionId) {
+          const base = await loadVerifiedContract(packageRoot);
+          const revisions = await readRevisionIndex(packageRoot, base.manifest.sessionId);
+          const entry = revisions.revisions.find((candidate) => candidate.revisionId === revisionId);
+          if (!entry) throw new Error(`Unknown revision: ${revisionId}`);
+          writeJson(response, 200, (await validateRevision(packageRoot, entry)).graph);
+          return;
+        }
         if (!manifest.evidenceGraph) {
           writeJson(response, 404, { error: 'graph_not_available' });
           return;
@@ -165,7 +212,8 @@ export async function startReviewServer(packageDirectory: string, port = 0): Pro
         };
         await mkdir(packageRoot, { recursive: true });
         await appendFile(annotationPath, `${JSON.stringify(annotation)}\n`, 'utf8');
-        writeJson(response, 201, annotation);
+        const revision = await createAnnotationRevision(packageRoot, annotation);
+        writeJson(response, 201, { ...annotation, revisionId: revision.revisionId });
         return;
       }
       if (url.pathname.startsWith('/api/visual/')) {

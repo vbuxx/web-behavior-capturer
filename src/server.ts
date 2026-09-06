@@ -24,6 +24,8 @@ const routes: Record<string, string> = {
   '/lifecycle-b/': resolve(probesRoot, 'lifecycle-b.html'),
   '/race-start/': resolve(probesRoot, 'race-start.html'),
   '/race-end/': resolve(probesRoot, 'race-end.html'),
+  '/open-shadow/': resolve(probesRoot, 'open-shadow.html'),
+  '/nested-scroller/': resolve(probesRoot, 'nested-scroller.html'),
   '/load/': resolve(loadFixtureRoot, 'index.html'),
   '/load.js': resolve(loadFixtureRoot, 'load.js'),
   '/load.css': resolve(loadFixtureRoot, 'load.css'),

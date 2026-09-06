@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>WBC nested scroller fixture</title><style>
+  body { margin: 0; font-family: sans-serif; } .scroller { width: 320px; height: 180px; overflow: auto; border: 1px solid #888; } .content { height: 700px; padding-top: 260px; } .target { opacity: .2; transition: opacity 120ms linear; } .target.revealed { opacity: 1; }
+</style></head>
+<body><div class="scroller" data-wbc-id="nested-scroller"><div class="content"><div class="target" data-wbc-id="nested-reveal">Nested reveal target</div></div></div>
+<script>
+  const scroller = document.querySelector('[data-wbc-id="nested-scroller"]');
+  const target = document.querySelector('[data-wbc-id="nested-reveal"]');
+  scroller.addEventListener('scroll', () => { target.classList.toggle('revealed', scroller.scrollTop > 120); });
+  window.__WBC_NESTED_SCROLLER__ = { scroller, target };
+</script></body></html>

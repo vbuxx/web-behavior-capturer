@@ -6,8 +6,12 @@ const evidence = document.querySelector('#evidence');
 const visuals = document.querySelector('#visuals');
 const graphSummary = document.querySelector('#graph-summary');
 const graphNodes = document.querySelector('#graph-nodes');
+const graphEdges = document.querySelector('#graph-edges');
 const annotations = document.querySelector('#annotations');
 const error = document.querySelector('#error');
+const revisionSelect = document.querySelector('#revision-select');
+const behaviorDetail = document.querySelector('#behavior-detail');
+let selectedRevision = '';
 
 function appendTextCell(row, value) {
   const cell = document.createElement('td');
@@ -23,7 +27,7 @@ async function json(path) {
 }
 
 async function loadEvidence() {
-  const page = await json('/api/evidence?limit=20&byteBudget=65536');
+  const page = await json(`/api/evidence?limit=20&byteBudget=65536${selectedRevision ? `&revisionId=${encodeURIComponent(selectedRevision)}` : ''}`);
   evidence.replaceChildren();
   for (const record of page.records) {
     const row = document.createElement('tr');
@@ -36,7 +40,7 @@ async function loadEvidence() {
 }
 
 async function loadVisuals() {
-  const page = await json('/api/visuals');
+  const page = await json(`/api/visuals${selectedRevision ? `?revisionId=${encodeURIComponent(selectedRevision)}` : ''}`);
   visuals.replaceChildren();
   for (const visual of page.visuals) {
     const figure = document.createElement('figure');
@@ -53,7 +57,7 @@ async function loadVisuals() {
 
 async function loadGraph() {
   try {
-    const graph = await json('/api/graph');
+    const graph = await json(`/api/graph${selectedRevision ? `?revisionId=${encodeURIComponent(selectedRevision)}` : ''}`);
     const counts = new Map();
     for (const node of graph.nodes) counts.set(node.kind, (counts.get(node.kind) ?? 0) + 1);
     graphSummary.textContent = `${graph.revision} · ${graph.edges.length} edges · ${graph.limitations.length} limitations`;
@@ -63,6 +67,15 @@ async function loadGraph() {
       appendTextCell(row, kind);
       appendTextCell(row, count);
       graphNodes.append(row);
+    }
+    graphEdges.replaceChildren();
+    for (const edge of graph.edges.slice(0, 80)) {
+      const row = document.createElement('tr');
+      appendTextCell(row, edge.from);
+      appendTextCell(row, edge.class);
+      appendTextCell(row, edge.to);
+      appendTextCell(row, edge.limitation);
+      graphEdges.append(row);
     }
   } catch (cause) {
     graphSummary.textContent = cause instanceof Error && cause.message.includes('graph_not_available') ? 'No evidence graph in this package revision.' : String(cause);
@@ -81,7 +94,7 @@ async function loadAnnotations() {
 
 async function load() {
   try {
-    const [session, behaviorPage] = await Promise.all([json('/api/session'), json('/api/behaviors?limit=100')]);
+    const [session, behaviorPage] = await Promise.all([json('/api/session'), json(`/api/behaviors?limit=100${selectedRevision ? `&revisionId=${encodeURIComponent(selectedRevision)}` : ''}`)]);
     sessionLine.textContent = `${session.productVersion} · ${session.sessionId}`;
     for (const [label, value] of Object.entries({ Integrity: session.integrity, Targets: session.counts.targets, Elements: session.counts.elements, Records: session.counts.records })) {
       const item = document.createElement('div');
@@ -104,6 +117,10 @@ async function load() {
       const ref = document.createElement('code');
       ref.textContent = behavior.targetRef;
       card.append(pill, title, ref);
+      card.addEventListener('click', () => void json(`/api/behaviors?limit=100${selectedRevision ? `&revisionId=${encodeURIComponent(selectedRevision)}` : ''}`).then(async () => {
+        const detail = await json(`/api/behavior/${encodeURIComponent(behavior.behaviorId)}${selectedRevision ? `?revisionId=${encodeURIComponent(selectedRevision)}` : ''}`).catch(() => null);
+        behaviorDetail.textContent = detail ? JSON.stringify(detail, null, 2) : `Behavior ${behavior.behaviorId} is available through MCP behavior.get.`;
+      }));
       behaviors.append(card);
     }
     for (const target of session.targets) {
@@ -120,7 +137,19 @@ async function load() {
   }
 }
 
+async function loadRevisions() {
+  const page = await json('/api/revisions');
+  for (const revision of page.revisions) {
+    const option = document.createElement('option');
+    option.value = revision.revisionId;
+    option.textContent = `${revision.revisionId} · ${revision.createdAt}`;
+    revisionSelect.append(option);
+  }
+  if (page.activeRevisionId) revisionSelect.value = page.activeRevisionId;
+}
+
 document.querySelector('#reload').addEventListener('click', () => void loadEvidence().catch((cause) => { error.textContent = cause.message; }));
+revisionSelect.addEventListener('change', () => { selectedRevision = revisionSelect.value; behaviors.replaceChildren(); metrics.replaceChildren(); targets.replaceChildren(); void load(); });
 document.querySelector('#annotation-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const note = document.querySelector('#annotation-note').value;
@@ -129,4 +158,4 @@ document.querySelector('#annotation-form').addEventListener('submit', (event) =>
     .then(() => { document.querySelector('#annotation-note').value = ''; return loadAnnotations(); })
     .catch((cause) => { error.textContent = cause.message; });
 });
-void load();
+void loadRevisions().then(() => { selectedRevision = revisionSelect.value; return load(); }).catch((cause) => { error.textContent = cause.message; });

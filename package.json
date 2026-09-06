@@ -40,10 +40,15 @@
     "replica-verify": "tsx src/cli.ts replica-verify",
     "mcp": "tsx src/mcp-server.ts",
     "test": "tsx --test --test-concurrency=1 test/**/*.test.ts",
-    "test:e2e": "tsx --test --test-concurrency=1 test/e2e.test.ts"
+    "test:e2e": "tsx --test --test-concurrency=1 test/e2e.test.ts",
+    "test:unit": "tsx --test --test-concurrency=1 test/agent-adapter.test.ts test/archive-retention.test.ts test/redaction.test.ts test/rotation-recovery.test.ts test/rotation-staging.test.ts test/session-service.test.ts test/staging.test.ts test/visual-redaction.test.ts",
+    "test:browser": "tsx --test --test-concurrency=1 test/capture-lifecycle.test.ts test/e2e.test.ts test/nested-scroller.test.ts test/open-shadow.test.ts test/review-server.test.ts",
+    "test:stress": "tsx --test --test-concurrency=1 test/benchmark.test.ts test/browser-benchmark.test.ts test/capture-benchmark.test.ts test/corruption-benchmark.test.ts test/crash-benchmark.test.ts test/failure-benchmark.test.ts test/quota-benchmark.test.ts test/reliability-benchmark.test.ts",
+    "test:endurance": "tsx src/cli.ts endurance-benchmark --duration-ms 300000",
+    "test:rc": "pnpm run build && pnpm run test:unit && pnpm run test:browser"
   },
   "engines": {
-    "node": ">=22.5"
+    "node": ">=24.14.0 <25"
   },
   "dependencies": {
     "ajv": "8.17.1",

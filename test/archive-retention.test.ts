@@ -15,10 +15,15 @@ test('retains newest verified archives and quarantines invalid ones', async () =
     await writeFile(join(archive, 'archive-invalid', 'session.sqlite'), 'corrupted');
     const old = new Date(Date.now() - 20_000);
     await utimes(join(archive, 'archive-old'), old, old);
-    const result = await pruneVerifiedArchives(archive, 1);
+    const dryRun = await pruneVerifiedArchives(archive, 1);
+    assert.equal(dryRun.plannedRemovals.length, 1);
+    assert.equal(dryRun.removed.length, 0);
+    assert.equal((await readdir(archive)).length, 3);
+    const result = await pruneVerifiedArchives(archive, 1, { apply: true });
     assert.equal(result.scanned, 3);
     assert.equal(result.verified, 2);
     assert.equal(result.retained.length, 1);
+    assert.equal(result.plannedRemovals.length, 1);
     assert.equal(result.removed.length, 1);
     assert.equal(result.quarantined.length, 1);
     assert.equal((await readdir(archive)).length, 2);

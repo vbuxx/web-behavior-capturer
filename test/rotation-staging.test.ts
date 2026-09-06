@@ -14,7 +14,10 @@ test('cleans only expired rotation staging directories', async () => {
     await mkdir(active, { recursive: true });
     const old = new Date(Date.now() - 10_000);
     await utimes(expired, old, old);
-    const result = await cleanupRotationStaging(archive, 1_000);
+    const dryRun = await cleanupRotationStaging(archive, 1_000);
+    assert.deepEqual(dryRun.plannedRemovals, [expired]);
+    assert.deepEqual(dryRun.removed, []);
+    const result = await cleanupRotationStaging(archive, 1_000, { apply: true });
     assert.equal(result.scanned, 2);
     assert.deepEqual(result.removed, [expired]);
     assert.deepEqual(result.retained, [active]);

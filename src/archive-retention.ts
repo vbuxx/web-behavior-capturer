@@ -8,11 +8,12 @@ export interface ArchiveRetentionResult {
   scanned: number;
   verified: number;
   retained: string[];
+  plannedRemovals: string[];
   removed: string[];
   quarantined: string[];
 }
 
-export async function pruneVerifiedArchives(archiveDirectory: string, keep = 5): Promise<ArchiveRetentionResult> {
+export async function pruneVerifiedArchives(archiveDirectory: string, keep = 5, options: { apply?: boolean } = {}): Promise<ArchiveRetentionResult> {
   if (!Number.isInteger(keep) || keep < 0 || keep > 1_000) throw new Error('Archive retention keep must be an integer from 0 to 1000');
   const archiveRoot = resolve(archiveDirectory);
   const entries = await readdir(archiveRoot, { withFileTypes: true });
@@ -30,7 +31,8 @@ export async function pruneVerifiedArchives(archiveDirectory: string, keep = 5):
   }
   verified.sort((left, right) => right.mtimeMs - left.mtimeMs);
   const retained = verified.slice(0, keep).map((item) => item.path);
-  const removed = verified.slice(keep).map((item) => item.path);
-  for (const path of removed) await rm(path, { recursive: true, force: true });
-  return { archiveDirectory: archiveRoot, keep, scanned: candidates.length, verified: verified.length, retained, removed, quarantined };
+  const plannedRemovals = verified.slice(keep).map((item) => item.path);
+  const removed = options.apply ? plannedRemovals : [];
+  if (options.apply) for (const path of plannedRemovals) await rm(path, { recursive: true, force: true });
+  return { archiveDirectory: archiveRoot, keep, scanned: candidates.length, verified: verified.length, retained, plannedRemovals, removed, quarantined };
 }
